@@ -56,25 +56,42 @@ def validate_case(data: dict[str, Any], path: Path) -> None:
         raise GoldenCaseError(f"{path}: change must be a non-empty string")
 
     expected = data.get("expected")
-    adversarial = data.get("adversarial")
-    if expected is None and adversarial is None:
-        raise GoldenCaseError(f"{path}: case must define expected and/or adversarial assertions")
+    if expected is None:
+        raise GoldenCaseError(f"{path}: case must define expected assertions")
 
-    if expected is not None:
-        exp = _require_mapping(expected, "expected", path)
-        for section in ("outcomes", "impacted_domains", "hidden_concerns", "decisions", "risks"):
-            if section in exp:
-                sec = _require_mapping(exp[section], f"expected.{section}", path)
-                for list_name in ("must_detect", "nice_to_detect"):
-                    if list_name in sec:
-                        _require_list(sec[list_name], f"expected.{section}.{list_name}", path)
-        if "noise" in exp:
-            noise = _require_mapping(exp["noise"], "expected.noise", path)
-            if "forbidden_or_irrelevant" in noise:
-                _require_list(noise["forbidden_or_irrelevant"], "expected.noise.forbidden_or_irrelevant", path)
+    exp = _require_mapping(expected, "expected", path)
 
-    if adversarial is not None:
-        adv = _require_mapping(adversarial, "adversarial", path)
-        for name in ("must_abstain_on", "must_not_invent"):
-            if name in adv:
-                _require_list(adv[name], f"adversarial.{name}", path)
+    # Standard structured cases.
+    for section in ("outcomes", "impacted_domains", "hidden_concerns", "decisions", "risks"):
+        if section in exp:
+            sec = _require_mapping(exp[section], f"expected.{section}", path)
+            for list_name in ("must_detect", "nice_to_detect"):
+                if list_name in sec:
+                    _require_list(sec[list_name], f"expected.{section}.{list_name}", path)
+
+    # Adversarial/sparse cases may intentionally use a flatter assertion shape.
+    for name in ("must_detect", "should_investigate", "must_not_claim_as_fact"):
+        if name in exp:
+            _require_list(exp[name], f"expected.{name}", path)
+
+    if "unknowns" in exp:
+        unknowns = _require_mapping(exp["unknowns"], "expected.unknowns", path)
+        if "should_abstain_on" in unknowns:
+            _require_list(unknowns["should_abstain_on"], "expected.unknowns.should_abstain_on", path)
+
+    if "noise" in exp:
+        noise = _require_mapping(exp["noise"], "expected.noise", path)
+        if "forbidden_or_irrelevant" in noise:
+            _require_list(noise["forbidden_or_irrelevant"], "expected.noise.forbidden_or_irrelevant", path)
+
+    if "dependencies" in exp:
+        deps = _require_mapping(exp["dependencies"], "expected.dependencies", path)
+        for name in ("must_include", "must_not_include"):
+            if name in deps:
+                values = _require_list(deps[name], f"expected.dependencies.{name}", path)
+                for index, item in enumerate(values):
+                    if not isinstance(item, dict):
+                        raise GoldenCaseError(f"{path}: expected.dependencies.{name}[{index}] must be a mapping")
+                    for field in ("from", "to", "type"):
+                        if field not in item:
+                            raise GoldenCaseError(f"{path}: expected.dependencies.{name}[{index}] missing '{field}'")
