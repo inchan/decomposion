@@ -1,0 +1,101 @@
+id: software.document-sharing
+version: 2
+partition: development
+context:
+  summary: >-
+    Existing multi-tenant RAG SaaS where users upload documents, documents are
+    parsed/chunked/embedded, retrieval feeds chat, and users belong to organizations.
+  evidence_quality: partial
+change: Add document sharing between users and organizations.
+expected:
+  outcomes:
+    must_detect:
+      - share_document
+      - access_only_when_authorized
+      - use_shared_document_in_rag
+      - permission_change_propagates
+      - revoke_share_blocks_future_access
+      - audit_share_and_access
+    nice_to_detect:
+      - share_expiration
+      - external_sharing_policy
+  impacted_domains:
+    must_detect:
+      - document
+      - identity
+      - organization
+      - permission
+      - retrieval
+      - vector_index
+      - chat
+      - audit
+    conditional:
+      - cache
+    must_not_invent:
+      - payment_gateway
+      - unrelated_billing_system
+  hidden_concerns:
+    must_detect:
+      - retrieval_authorization
+      - vector_metadata_acl
+      - existing_chat_history_policy
+      - tenant_boundary
+      - ownership_transfer_or_departure
+    conditional:
+      - cache_invalidation_on_revoke
+  decisions:
+    must_detect:
+      - sharing_principal_scope
+      - external_sharing_allowed
+      - acl_enforcement_strategy
+  risks:
+    must_detect:
+      - revoked_content_leakage
+      - cross_tenant_access
+      - stale_index_acl
+    conditional:
+      - stale_cache_acl
+  unknowns:
+    should_abstain_on:
+      - whether_semantic_cache_exists
+      - exact_vector_store_filter_capabilities
+      - current_chat_history_retention_semantics
+  dependencies:
+    must_include:
+      - from: acl_policy
+        to: retrieval_enforcement
+        semantic_type: requires_decision
+        execution_effect: blocking
+        strength: hard
+      - from: acl_data_model
+        to: share_api
+        semantic_type: blocks_execution
+        execution_effect: blocking
+        strength: hard
+      - from: retrieval_enforcement
+        to: rag_integration
+        semantic_type: blocks_execution
+        execution_effect: blocking
+        strength: hard
+    must_not_include:
+      - from: share_ui
+        to: acl_policy
+        semantic_type: blocks_execution
+  noise:
+    forbidden_or_irrelevant:
+      - payment_gateway
+      - ocr_model_selection
+      - unrelated_billing_redesign
+  granularity:
+    examples_too_broad:
+      - implement_document_sharing
+    examples_appropriate:
+      - define_acl_policy
+      - implement_document_acl_model
+      - enforce_acl_in_retrieval
+      - add_share_management_ui
+    conditional_tasks:
+      - invalidate_permission_sensitive_cache
+    examples_too_fine:
+      - run_database_cli_command
+      - add_single_import_statement

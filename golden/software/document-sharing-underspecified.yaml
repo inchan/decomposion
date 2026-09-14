@@ -1,0 +1,38 @@
+id: software.document-sharing-underspecified
+version: 1
+partition: adversarial
+context:
+  summary: >-
+    Existing SaaS supports documents and chat. No evidence is provided about
+    tenant model, vector search, cache, billing, or external sharing.
+  evidence_quality: intentionally_sparse
+change: Let users share documents.
+expected:
+  must_detect:
+    - authorization_policy_needed
+    - sharing_principal_scope_decision
+    - revoke_or_permission_change_semantics
+  should_investigate:
+    - organization_or_tenant_boundaries
+    - search_or_retrieval_access_path
+    - historical_chat_exposure
+  unknowns:
+    should_abstain_on:
+      - whether_vector_database_exists
+      - whether_semantic_cache_exists
+      - whether_product_is_multi_tenant
+      - whether_external_sharing_is_supported
+      - whether_billing_is_affected
+  must_not_claim_as_fact:
+    - redis_cache_exists
+    - vector_metadata_acl_required
+    - cross_tenant_access_path_exists
+    - stripe_plan_change_required
+  noise:
+    forbidden_or_irrelevant:
+      - payment_gateway_migration
+      - ocr_model_selection
+      - gpu_capacity_planning
+  evaluation_intent: >-
+    Reward useful questions and abstention. Penalize turning common RAG/SaaS
+    patterns into asserted facts when the supplied context does not support them.
