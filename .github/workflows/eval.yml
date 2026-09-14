@@ -22,7 +22,7 @@ jobs:
       - name: Validate golden-set schemas
         run: python -m eval_harness.cli --golden-dir golden
       - name: Run deterministic tests
-        run: pytest
+        run: python -m pytest
       - name: Run baseline matrix fixture pipeline
         run: python -m eval_harness.matrix_cli --golden-dir golden --output eval-report.md
       - name: Publish evaluation summary
