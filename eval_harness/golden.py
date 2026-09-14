@@ -61,15 +61,13 @@ def validate_case(data: dict[str, Any], path: Path) -> None:
 
     exp = _require_mapping(expected, "expected", path)
 
-    # Standard structured cases.
     for section in ("outcomes", "impacted_domains", "hidden_concerns", "decisions", "risks"):
         if section in exp:
             sec = _require_mapping(exp[section], f"expected.{section}", path)
-            for list_name in ("must_detect", "nice_to_detect"):
+            for list_name in ("must_detect", "nice_to_detect", "conditional", "must_not_invent"):
                 if list_name in sec:
                     _require_list(sec[list_name], f"expected.{section}.{list_name}", path)
 
-    # Adversarial/sparse cases may intentionally use a flatter assertion shape.
     for name in ("must_detect", "should_investigate", "must_not_claim_as_fact"):
         if name in exp:
             _require_list(exp[name], f"expected.{name}", path)
@@ -92,6 +90,10 @@ def validate_case(data: dict[str, Any], path: Path) -> None:
                 for index, item in enumerate(values):
                     if not isinstance(item, dict):
                         raise GoldenCaseError(f"{path}: expected.dependencies.{name}[{index}] must be a mapping")
-                    for field in ("from", "to", "type"):
+                    for field in ("from", "to", "semantic_type"):
                         if field not in item:
                             raise GoldenCaseError(f"{path}: expected.dependencies.{name}[{index}] missing '{field}'")
+                    if name == "must_include":
+                        for field in ("execution_effect", "strength"):
+                            if field not in item:
+                                raise GoldenCaseError(f"{path}: expected.dependencies.{name}[{index}] missing '{field}'")
