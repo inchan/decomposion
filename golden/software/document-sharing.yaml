@@ -1,0 +1,80 @@
+id: software.document-sharing
+version: 1
+context:
+  summary: >-
+    Existing multi-tenant RAG SaaS where users upload documents, documents are
+    parsed/chunked/embedded, retrieval feeds chat, and users belong to organizations.
+change: Add document sharing between users and organizations.
+expected:
+  outcomes:
+    must_detect:
+      - share_document
+      - access_only_when_authorized
+      - use_shared_document_in_rag
+      - permission_change_propagates
+      - revoke_share_blocks_future_access
+      - audit_share_and_access
+    nice_to_detect:
+      - share_expiration
+      - external_sharing_policy
+  impacted_domains:
+    must_detect:
+      - document
+      - identity
+      - organization
+      - permission
+      - retrieval
+      - vector_index
+      - chat
+      - cache
+      - audit
+  hidden_concerns:
+    must_detect:
+      - retrieval_authorization
+      - vector_metadata_acl
+      - cache_invalidation_on_revoke
+      - existing_chat_history_policy
+      - tenant_boundary
+      - ownership_transfer_or_departure
+  decisions:
+    must_detect:
+      - sharing_principal_scope
+      - external_sharing_allowed
+      - acl_enforcement_strategy
+  risks:
+    must_detect:
+      - revoked_content_leakage
+      - cross_tenant_access
+      - stale_index_or_cache_acl
+  dependencies:
+    must_include:
+      - from: acl_policy
+        to: retrieval_enforcement
+        type: requires_decision
+      - from: acl_data_model
+        to: share_api
+        type: blocks_execution
+      - from: retrieval_enforcement
+        to: rag_integration
+        type: blocks_execution
+    must_not_include:
+      - from: share_ui
+        to: acl_policy
+        type: blocks_execution
+  noise:
+    forbidden_or_irrelevant:
+      - payment_gateway
+      - ocr_model_selection
+      - unrelated_billing_redesign
+  granularity:
+    examples_too_broad:
+      - implement_document_sharing
+    examples_appropriate:
+      - define_acl_policy
+      - implement_document_acl_model
+      - enforce_acl_in_retrieval
+      - invalidate_permission_sensitive_cache
+      - add_share_management_ui
+    examples_too_fine:
+      - run_database_cli_command
+      - add_single_import_statement
