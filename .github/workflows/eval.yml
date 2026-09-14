@@ -1,0 +1,31 @@
+name: Evaluation
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip 'PyYAML>=6,<7' 'pytest>=8,<9'
+      - name: Validate golden-set schemas
+        run: python -m eval_harness.cli --golden-dir golden
+      - name: Run deterministic tests
+        run: pytest
+
+  llm-smoke-placeholder:
+    runs-on: ubuntu-latest
+    if: ${{ false }}
+    steps:
+      - run: echo 'Enable only after provider/model/seed/cost policy and secrets are explicitly configured.'
