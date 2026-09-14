@@ -56,7 +56,7 @@ Output:
 - contradictions
 - initial dependency graph
 
-Analysis may return a long-running task handle when work cannot safely complete in one synchronous call.
+When the negotiated MCP/runtime capabilities support long-running task primitives, analysis may return a task/operation handle instead of blocking one synchronous call. Otherwise the server should expose an application-level operation handle with equivalent semantics.
 
 ### `project.get_plan`
 
@@ -162,16 +162,18 @@ For environments requiring stronger enforcement, use wrapper scripts, hooks, CI 
 
 Repository-scale analysis, large document ingestion, or full graph re-analysis may exceed a normal synchronous tool call.
 
-The integration should therefore support a task lifecycle compatible with the surrounding MCP/runtime capabilities:
+If the connected MCP version/runtime negotiates a task-style lifecycle, use it. If not, use Decomposion's own explicit operation resource with the same lifecycle properties:
 
 - create/start work;
-- receive task/operation handle;
-- poll or receive completion state;
+- receive operation handle;
+- retrieve status/result;
 - cancel when supported;
 - retrieve final graph delta;
 - apply the delta against the expected revision.
 
 Long-running results must still honor revision conflict checks before mutation.
+
+Do not couple the core domain model to a specific experimental transport extension. Transport capabilities are adapters around the same operation state machine.
 
 ## What must remain deterministic
 
