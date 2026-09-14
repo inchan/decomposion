@@ -46,7 +46,7 @@ Output:
 - Decisions and risks
 - Typed Dependency Graph
 - Execution-ready work graph
-- Multiple projections: Outcome, Domain, Dependency, Risk
+- Multiple projections: Outcome, Domain, Dependency, Risk, and optionally Actor when useful
 
 ## Core UX
 
@@ -74,7 +74,7 @@ The underlying graph stays stable while the UI projects it by:
 - Domain
 - Dependency
 - Risk
-- Actor
+- Actor when the graph contains meaningful actor metadata
 
 Timeline is deferred until duration/resource semantics are trustworthy.
 
