@@ -4,28 +4,69 @@
 
 Validate one thesis before expanding scope:
 
-> Given existing software context and a proposed change, can Decomposion reveal meaningful affected areas, hidden concerns, dependencies, and decisions that a competent team might otherwise miss?
+> Given existing software context and a proposed change, can Decomposion reveal meaningful affected areas, hidden concerns, dependencies, and decisions better than a strong plain-LLM baseline, while controlling hallucination and noise?
 
-## Phase 1 — Canonical graph core
+The MVP must be optimized for falsifiability. We should be able to prove that the reasoning architecture adds value beyond a good prompt.
 
-Build:
+## Phase 0 — Evaluation before architecture lock-in
 
-- typed node/edge schema
-- graph persistence
-- revision history
-- deterministic invariant validation
-- topological ordering and readiness calculation
-- evidence/provenance model
+Build a small evaluation harness before hardening the graph model.
+
+Start with 20 strong software-change cases split into:
+
+- development set — visible to prompt/engine authors;
+- blind test set — authored or reviewed independently;
+- adversarial set — ambiguous, underspecified, misleading, and no-impact cases.
+
+Every case must be run against at least:
+
+1. a strong plain-LLM prompt baseline;
+2. Decomposion minimal pipeline;
+3. later engine revisions.
+
+Track correctness, useful surprise, actionability, abstention quality, and noise.
 
 Exit criteria:
 
-- graph can round-trip without semantic loss;
-- deterministic validators catch cycles/orphans/invalid edge combinations;
-- human-confirmed edits survive re-analysis.
+- repeatable baseline exists;
+- failure taxonomy exists;
+- blind/adversarial cases exist;
+- we can measure whether Decomposion materially beats a plain-LLM prompt.
 
-## Phase 2 — Reasoning pipeline
+## Phase 1 — Minimal reasoning IR
 
-Implement independently evaluable stages:
+Do not freeze the full canonical schema yet.
+
+Start only with concepts repeatedly required by the first evaluation cases:
+
+- entity/system fact;
+- outcome;
+- decision;
+- risk;
+- task;
+- evidence;
+- hard dependency.
+
+Add node/edge kinds only when repeated failures demonstrate a need.
+
+The IR must support epistemic state:
+
+- observed;
+- inferred;
+- proposed;
+- unknown;
+- contradicted;
+- human_confirmed.
+
+Exit criteria:
+
+- evaluation cases can round-trip through the IR without blocking useful analysis;
+- unknown and contradictory evidence can be represented explicitly;
+- schema changes remain cheap.
+
+## Phase 2 — Independently evaluable reasoning passes
+
+Implement passes as structured graph-delta producers:
 
 1. Context Mapper
 2. Goal normalizer
@@ -36,101 +77,118 @@ Implement independently evaluable stages:
 7. Task synthesis
 8. Granularity Critic
 
-Each stage consumes and returns structured graph deltas rather than prose-only output.
+Each pass must be scored separately where practical.
+
+Critical behavior:
+
+- the engine may abstain;
+- missing evidence must create an `unknown` or information requirement instead of fabricated certainty;
+- inferred high-impact additions require rationale and provenance;
+- numerical confidence is treated as an uncalibrated model signal until calibration is demonstrated.
 
 Exit criteria:
 
-- stage outputs can be scored separately on golden cases;
-- every inferred high-impact addition has rationale/confidence;
-- pipeline can explain why a node/edge exists.
+- stage outputs can be evaluated independently;
+- meaningful failure classes are attributable to a stage;
+- engine can say `insufficient evidence` without inventing structure.
 
-## Phase 3 — Golden-set harness
+## Phase 3 — Schema hardening and deterministic semantics
 
-Start with 20 high-quality cases before expanding to 100.
+Only after 20–50 evaluation cases, promote stable concepts into the canonical graph.
 
-Prioritize:
+Define formal execution semantics for dependency edges:
 
-- document sharing in RAG SaaS
-- account deletion
-- SSO
-- document versioning
-- external API
-- role/permission redesign
-- billing-plan change
-- data migration
-- semantic cache introduction
-- tenant isolation
-- webhook support
-- audit logging
-- background-job redesign
-- storage-provider migration
-- search index change
-- chat history retention
-- API versioning
-- file-sharing expiration
-- incident recovery change
-- feature-flag rollout
+- whether they block readiness;
+- whether they are hard, soft, or advisory;
+- their resolution condition;
+- how invalidation reopens downstream work.
+
+Deterministic code should own:
+
+- schema validation;
+- cycle detection;
+- readiness calculation;
+- topological ordering;
+- orphan detection;
+- duplicate semantic-node checks;
+- revision creation;
+- human-override preservation;
+- stale-evidence invalidation.
 
 Exit criteria:
 
-- repeatable baseline score;
-- failure taxonomy documented;
-- regression comparison automated.
+- dependency semantics are testable;
+- graph invariants are deterministic;
+- schema changes are justified by repeated evidence, not taste.
 
 ## Phase 4 — Graph + Chat UI
 
 First UI should support:
 
-- Current System Map
-- Change Graph
-- Outcome view
-- Domain view
-- Dependency view
-- Risk view
-- click node for evidence/rationale
-- accept/reject/edit an inferred node
-- natural-language graph operations, e.g. `look again from a security perspective`
+- Current System Map;
+- Change Graph;
+- Outcome view;
+- Domain view;
+- Dependency view;
+- Risk view;
+- click node for evidence/rationale;
+- explicit observed/inferred/unknown/contradicted state;
+- accept/reject/edit inferred nodes;
+- natural-language graph operations such as `look again from a security perspective`.
 
-Do not build project-management chrome yet.
+Do not promise a true timeline until duration/resource semantics exist.
 
 ## Phase 5 — MCP integration
 
-Expose the core tools in `docs/MCP.md`.
+Expose the reasoning layer to Claude Code/Codex after revision and concurrency semantics are defined.
 
 Target flow:
 
-- Claude Code/Codex calls Decomposion before implementation;
-- reports architecture discoveries during work;
+- agent requests analysis before implementation;
+- receives a project/change/revision handle;
+- reports architecture discoveries;
 - requests impact review before material design deviations;
-- marks tasks complete with evidence;
-- requests final plan validation.
+- completes tasks against an expected graph revision;
+- handles revision conflicts explicitly;
+- requests final validation before declaring completion.
+
+Long-running reasoning must support asynchronous task lifecycle rather than assuming every analysis fits one synchronous tool call.
 
 ## Phase 6 — Evidence connectors
 
 Add in this order unless evaluation disproves the priority:
 
-1. local/project documents
-2. Git repository evidence
-3. GitHub metadata/PR evidence
-4. Linear/Jira
-5. broader document systems
+1. local/project documents;
+2. Git repository evidence;
+3. GitHub metadata/PR evidence;
+4. Linear/Jira;
+5. broader document systems.
+
+Every evidence reference should be version-addressable where possible: commit SHA, blob SHA, document version, immutable content hash, or equivalent.
 
 ## Explicitly defer
 
-- direct shell execution
-- autonomous coding-agent orchestration
-- automatic deployment
-- resource scheduling
-- generalized workflow builder
-- full PM replacement
-- many-agent routing
+- direct shell execution;
+- autonomous coding-agent orchestration;
+- automatic deployment;
+- resource scheduling;
+- generalized workflow builder;
+- full PM replacement;
+- many-agent routing;
+- full Gantt planning.
 
 ## Product success signal
 
-The strongest early signal is not task-generation quality.
+Do not optimize for surprise alone.
 
-It is repeated user feedback equivalent to:
+A useful discovery should score high on:
 
-> `I had not considered that affected area / risk / dependency.`
+- correctness;
+- actionability;
+- non-obviousness;
+- evidence quality;
+- low false-positive cost.
 
-The second signal is that users accept the generated structure as the starting point for actual implementation planning rather than rewriting it from scratch.
+The strongest early product signal is:
+
+> The system repeatedly surfaces correct, actionable impacts or missing decisions that a strong plain-LLM baseline and a competent reviewer are likely to miss, without flooding the user with speculative noise.
