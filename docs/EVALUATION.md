@@ -29,7 +29,7 @@ Cases visible to engine authors. Useful for prompt design and regression debuggi
 
 ### Blind test set
 
-Cases whose expected concerns are authored or reviewed independently and not exposed during prompt iteration.
+Cases whose expected concerns are authored or reviewed independently and not exposed during prompt iteration. Ideally, the person producing the expected answer does not see Decomposion output first.
 
 ### Adversarial set
 
@@ -64,7 +64,7 @@ Every test case should run against the same context under at least:
 2. **Structured-prompt baseline** — same model with a carefully engineered checklist but no persistent graph architecture.
 3. **Decomposion** — full reasoning pipeline.
 
-Where possible freeze model version, temperature/reasoning settings, and context window for fair comparison.
+Where possible freeze model version, reasoning settings, and context window for fair comparison.
 
 A high absolute score is not enough. The product must demonstrate incremental value over a good baseline.
 
@@ -158,6 +158,8 @@ For every engine revision:
 6. Human-review a stable sample of high-impact discoveries and false positives.
 7. Compare against previous Decomposion version and baseline deltas.
 8. Reject regressions in critical recall, abstention, or noise even if aggregate score improves.
+
+Blind expected answers should remain inaccessible to prompt/engine iteration until the evaluation run is committed. When practical, use a different reviewer or external domain expert to adjudicate ambiguous cases.
 
 ## Release gates
 
