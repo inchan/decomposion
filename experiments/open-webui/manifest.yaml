@@ -1,0 +1,29 @@
+experiment_id: open-webui-change-impact-v1
+version: 1
+target:
+  repository: open-webui/open-webui
+  clone_url: https://github.com/open-webui/open-webui.git
+  commit: 0a7c15832fb30b1903753e83f81dc7d27e5b0944
+  default_branch: main
+protocol:
+  strategies:
+    - plain
+    - structured
+    - decomposion
+  repeats: 3
+  total_prompts: 10
+  implementation_required: false
+  repository_mutation_allowed: false
+  notes: >-
+    The first experiment measures planning/change-impact reasoning only. Agents must inspect
+    the pinned repository but must not implement the requested changes.
+outputs:
+  root: .experiment-results/open-webui
+  required_per_run:
+    - answer.md
+    - metadata.json
+controls:
+  same_model_across_strategies: true
+  fresh_agent_session_per_run: true
+  no_cross_run_memory: true
+  record_model_and_agent_version: true
