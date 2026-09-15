@@ -1,0 +1,54 @@
+version: 1
+prompts:
+  - id: P01-document-sharing-revocation
+    change: >-
+      Add document sharing between users and groups. A recipient may use a shared document in
+      retrieval-backed chat. Permission changes and revocation must take effect without leaking
+      content through existing access paths. Analyze the change; do not implement it.
+  - id: P02-account-deletion-ownership
+    change: >-
+      Add self-service account deletion for users who may own chats, uploaded files, knowledge,
+      shared resources, API credentials, and organization-scoped data. Some records may require
+      retention. Analyze the complete impact and decisions; do not implement it.
+  - id: P03-enterprise-sso-domain-migration
+    change: >-
+      Introduce enterprise SSO with domain-based enrollment while preserving existing local
+      accounts. Users can change email addresses, organizations can change verified domains, and
+      rollback from SSO must be possible. Analyze migration, identity, authorization and failure
+      paths; do not implement it.
+  - id: P04-cross-workspace-knowledge-copy
+    change: >-
+      Let an administrator copy a knowledge collection from one workspace/organization to another,
+      including documents and metadata, but not permissions that are invalid in the destination.
+      The operation should be retryable and safe after partial failure. Analyze only.
+  - id: P05-retention-and-legal-hold
+    change: >-
+      Add configurable retention policies for chats and uploaded documents plus legal hold. Deletion
+      may be requested by a user while a hold is active. Search, RAG, exports and backups may expose
+      retained content. Determine affected areas, decisions and ordering; do not implement it.
+  - id: P06-model-routing-cost-quotas
+    change: >-
+      Add organization-level model routing and monthly cost quotas. Requests may use tools, RAG and
+      fallback models, and streaming requests can fail midway. Quota enforcement must avoid obvious
+      bypasses while keeping existing personal usage working. Analyze only.
+  - id: P07-public-share-link
+    change: >-
+      Add revocable public share links for selected chats. Owners can optionally expose cited source
+      documents, links can expire, and later edits to the original chat should have explicit
+      semantics. Analyze security, data lifecycle and product decisions; do not implement it.
+  - id: P08-encryption-key-rotation
+    change: >-
+      Support per-organization encryption keys and key rotation for sensitive stored content without
+      taking the service offline. Existing data, background jobs, search/indexing and rollback must
+      be considered. Do not assume a specific key-management provider unless the repository proves it.
+  - id: P09-offline-import-conflicts
+    change: >-
+      Allow users to export a portable workspace bundle and later import it into another installation.
+      IDs, users, models, knowledge references and permissions may conflict or be absent at the
+      destination. Analyze compatibility, mapping, security and partial-failure behavior only.
+  - id: P10-underspecified-audit-mode
+    change: >-
+      Add an enterprise audit mode that records important user and administrator actions and allows
+      authorized auditors to search them. The request intentionally does not specify storage,
+      retention, tenant model, export format or compliance standard. Separate facts, hypotheses,
+      unknowns and required decisions; do not implement it.
