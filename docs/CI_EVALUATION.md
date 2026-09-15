@@ -1,93 +1,65 @@
-# CI Evaluation
+# CI evaluation and environment verification
 
-## What runs on every PR
+## Implemented jobs
 
-The CI layer is intentionally deterministic and free of external model/API dependencies until provider policy is versioned.
+`.github/workflows/eval.yml` runs on PRs, master pushes and manual dispatch.
+It uses read-only repository permissions, pinned action commits, timeouts and
+cancellation of superseded runs. There are no provider secrets or paid model calls.
 
-1. Validate every `golden/**/*.yaml` case.
-2. Reject malformed expected/dependency/unknown assertion structures.
-3. Run deterministic scoring tests for required concepts, forbidden concepts, and abstention behavior.
-4. Run all pytest regression tests.
-5. Execute the three-strategy matrix contract (`plain`, `structured`, `decomposion`) through deterministic fixture adapters.
-6. Publish a Markdown evaluation table to the GitHub Actions step summary.
+`deterministic` (Linux, Python 3.11 and 3.13):
 
-The workflow is `.github/workflows/eval.yml`.
+1. Install the actual editable package from `pyproject.toml`; run `pip check`.
+2. Check the installed CLI and runtime diagnostics.
+3. Validate both existing golden cases and the ten-prompt Open WebUI experiment manifest.
+4. Run unit/regression tests and local-Git workspace integration tests.
+5. Run the fixture baseline matrix; label its report **FIXTURE ONLY**.
+6. Build a wheel, install it into a separate venv and import it from outside the source tree.
+7. Retain JUnit diagnostics and fixture reports, including on failures.
 
-## Baseline matrix architecture
+`real-target-setup` (Linux, Python 3.11):
 
-All strategies implement the same interface:
+1. Execute the documented bootstrap script.
+2. Fetch the real Open WebUI repository at the manifest's fixed commit.
+3. Freeze a nine-session smoke queue and prepare one independent run checkout.
+4. Confirm preparation/status without starting a model or the target application.
 
-- input: case id, supplied context, change request;
-- output: normalized concepts, explicit abstentions, metadata.
+Network failure in the real-target job is reported as failure, not as a model
+quality regression. Inspect logs before rerunning. Mergeability is not CI success.
+Dev Container configuration is provided, but this workflow does not launch Codespaces.
 
-The matrix runner scores each strategy against exactly the same Golden Case assertions. This prevents each baseline from quietly using a different metric or data shape.
+## What is NOT measured
 
-Current strategies are deterministic fixtures. They validate the runner, scorers, aggregation, report generation, and CI wiring without pretending to measure model quality.
+The fixture matrix does not compare real Plain/Structured/Decomposion model outputs.
+The ten experiment prompts have no independently validated gold answers yet.
+The current concept-ID scorer is not a semantic judge or a full dependency/graph validator.
+Do not infer recall improvements, model costs, latency or correctness from green CI.
 
-When model-backed evaluation is enabled, replace/add adapters while preserving the contract:
+## Scoring correction in 0.2.0.dev0
 
-1. `plain` — a strong direct analysis prompt with no Decomposion-specific reasoning stages;
-2. `structured` — a strong structured prompt that explicitly asks for outcomes, impacts, uncertainty, and dependencies;
-3. `decomposion` — the actual staged reasoning pipeline.
+Previously the expected abstention labels were passed in place of actual model
+abstentions, and absence from produced concepts earned credit. An empty output could
+therefore receive full abstention credit. The scorer now requires both:
 
-## Why live LLM evaluation is not enabled by default
+- `expected_abstentions`: rubric labels;
+- `abstained`: explicit output labels, supplied from `EvalOutput.abstentions`.
 
-A model-backed gate is useful only after the following are explicit and versioned:
+An asserted concept cannot simultaneously earn abstention credit. Nested
+`must_not_invent` assertions now participate in forbidden scoring. Strategy inputs
+are deep-copied; gold labels are not included. Empty matrices and duplicate case or
+strategy identifiers fail instead of yielding an apparently valid report.
 
-- provider and exact model ID;
-- prompt version for each strategy;
-- model parameters and repeat policy;
-- secrets and budget ceiling;
-- retry/error policy;
-- raw-output retention for audit;
-- variance policy and release thresholds;
-- provider failure behavior;
-- cost and latency measurement.
+The forbidden metric is a hit fraction over known forbidden labels, not general
+precision. Undefined metrics retain legacy neutral values; inspect support counts.
+Old and new abstention reports are not comparable without rescoring old outputs.
 
-Until then, a live model-backed PR gate would look authoritative while being neither reproducible nor cost-controlled. The workflow keeps a disabled placeholder rather than silently calling a provider.
+## Improvement protocol
 
-## Metrics
+Reproduce a failure as a deterministic test before changing the implementation.
+Preserve old artifacts; freeze new protocol/source versions in a new workspace.
+Use `decomposion lab audit` to recheck record integrity. This does not evaluate the
+truth of answers or protect against an adversary rewriting every stored hash.
 
-Compare at minimum:
-
-- must-detect recall;
-- forbidden/noise rate;
-- abstention accuracy;
-- dependency correctness;
-- invariant violations;
-- latency;
-- model cost.
-
-Future comparison reports should also include per-case regressions so an aggregate gain cannot hide a critical miss.
-
-## Regression policy
-
-The product thesis is comparative, not absolute. Decomposion should not be considered justified merely because it obtains a high standalone score.
-
-Once real model adapters exist, PR CI should fail or warn on policy-defined regressions such as:
-
-- critical must-detect recall falling materially below the frozen baseline;
-- forbidden/noise rate materially increasing;
-- abstention accuracy materially decreasing;
-- new invariant violations or dependency cycles;
-- Decomposion failing to beat the strongest reasonable baseline by the agreed margin on the targeted wedge.
-
-Thresholds must be derived from measured variance rather than invented in advance.
-
-## Recommended cadence
-
-- PR: deterministic checks plus 5–10 model smoke cases once enabled.
-- Nightly/manual: full development and adversarial set with repeated runs where variance matters.
-- Release candidate: blind/held-out set with frozen prompts/model configuration.
-
-## Initial release gates
-
-Deterministic gates:
-
-- zero malformed golden cases;
-- zero graph invariant violations once graph implementation exists;
-- zero dependency cycles in accepted execution graphs;
-- all regression tests pass;
-- baseline matrix/report pipeline completes successfully.
-
-Model-backed thresholds should be derived from baseline runs rather than invented before measurements exist.
+Live model experiments are operator-run as documented in [LOCAL_LAB.md](LOCAL_LAB.md).
+Keep model identity, settings and context fixed, record extra compute for multi-pass
+runs, review evidence independently, and keep real held-out labels outside agent access.
+No automatic nightly model workload is registered by this repository.

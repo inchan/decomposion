@@ -4,6 +4,26 @@ Decomposion is a **project reasoning layer** for turning complex changes into st
 
 It is intentionally not a generic project manager and not another coding agent. The initial product sits **before and alongside** tools such as Claude Code and Codex: it helps determine what must change, what is affected, what is missing, what is still unknown, what must happen first, and what evidence supports the plan.
 
+## Try the local experiment lab
+
+The repository now provides an installable, provider-free CLI (`0.2.0.dev0`, not a published PyPI release):
+
+```bash
+python3 scripts/bootstrap_lab.py
+. .venv/bin/activate
+decomposion doctor
+python -m pytest
+decomposion lab init --workspace "$HOME/decomposion-lab" --profile smoke
+```
+
+See [the Korean local/cloud runbook](docs/LOCAL_LAB.md) for model controls, independent checkouts,
+four-stage manual analysis, recording and version management. Open this checkout in a Dev Container
+or Codespaces to use `.devcontainer/devcontainer.json`.
+
+**No command above runs a model.** This is an experiment preparation/recording layer, not a completed
+reasoning engine or MCP server. A captured answer is not a validated answer. Fixture CI reports are
+not evidence of model performance. Live experiments remain under the operator's control.
+
 ## Core idea
 
 `Goal -> Outcomes -> Multi-lens Impact Scan -> Gap Critic -> Typed Dependencies -> Tasks -> Projections`
@@ -18,6 +38,8 @@ But Decomposion must not turn common patterns into invented facts. If the suppli
 
 ## Repository map
 
+- [`docs/LOCAL_LAB.md`](docs/LOCAL_LAB.md) — installation and executable local/cloud experiment protocol
+- [`CHANGELOG.md`](CHANGELOG.md) — development-version changes
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — positioning, product principles, validation bar
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — reasoning pipeline and runtime architecture
 - [`docs/GRAPH_SCHEMA.md`](docs/GRAPH_SCHEMA.md) — working IR, epistemic states, dependency semantics
