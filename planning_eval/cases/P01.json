@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "id": "P01",
+  "status": "development_unvalidated",
+  "target": {
+    "repository": "open-webui/open-webui",
+    "commit": "0a7c15832fb30b1903753e83f81dc7d27e5b0944"
+  },
+  "change": "Extend document sharing between users and groups. Recipients must be able to use shared documents in retrieval-backed chat; permission changes and revocation must prevent future unauthorized disclosures across supported access paths. Identify existing support before proposing changes. Produce a reviewable change plan, not an implementation.",
+  "sources": [
+    {
+      "id": "F",
+      "path": "backend/open_webui/utils/access_control/files.py",
+      "blob": "efc8b112221eb089f9881d5c66d3a253af5a69bb",
+      "start": 1,
+      "end": 140,
+      "anchor": "async def has_access_to_file("
+    },
+    {
+      "id": "K",
+      "path": "backend/open_webui/routers/knowledge.py",
+      "blob": "3b58c6f805588ff23ef2ea613ed2a3260c978f75",
+      "start": 1,
+      "end": 85,
+      "anchor": "async def delete_file_resource("
+    }
+  ],
+  "obligations": [
+    {
+      "id": "share_outcome",
+      "kind": "outcome",
+      "severity": "major",
+      "requirement": "Authorized recipients can use shared documents in retrieval-backed chat.",
+      "acceptance": "State the recipient-visible success condition and denial after effective access is lost.",
+      "basis": [
+        "request"
+      ]
+    },
+    {
+      "id": "reuse_grants",
+      "kind": "impact",
+      "severity": "major",
+      "requirement": "Reconcile the feature with existing AccessGrants and file-access helpers.",
+      "acceptance": "Identify existing knowledge/model/shared-chat grants and prefer extending or explicitly justifying replacement, not claiming no access control exists.",
+      "basis": [
+        "F"
+      ]
+    },
+    {
+      "id": "principal_policy",
+      "kind": "decision",
+      "severity": "critical",
+      "requirement": "Define user/group rights, ownership and effective access across multiple grants.",
+      "acceptance": "Decide permitted operations and how surviving grants affect revocation; removing one grant need not remove all legitimate access.",
+      "basis": [
+        "F",
+        "request"
+      ]
+    },
+    {
+      "id": "paths",
+      "kind": "impact",
+      "severity": "critical",
+      "requirement": "Review file access through knowledge, models, channels and shared chats.",
+      "acceptance": "Explicitly cover each evidenced path, or justify exclusion rather than treating the share dialog as the whole boundary.",
+      "basis": [
+        "F"
+      ]
+    },
+    {
+      "id": "retrieval_auth",
+      "kind": "task",
+      "severity": "critical",
+      "requirement": "Authorize retrieval and context construction for the current recipient.",
+      "acceptance": "Plan checks before unauthorized source content reaches generation, including tests; do not prescribe a particular vector vendor or ACL storage as mandatory.",
+      "basis": [
+        "request",
+        "F"
+      ]
+    },
+    {
+      "id": "revoke_policy",
+      "kind": "decision",
+      "severity": "critical",
+      "requirement": "Define the revocation consistency boundary and in-flight behavior.",
+      "acceptance": "Decide when revocation is effective for new and in-flight requests; do not promise retroactive removal of information already delivered.",
+      "basis": [
+        "request"
+      ]
+    },
+    {
+      "id": "revoke_paths",
+      "kind": "task",
+      "severity": "critical",
+      "requirement": "Propagate effective permission changes across current access paths.",
+      "acceptance": "Plan enforcement for files and chat/retrieval, preserving other legitimate grants and handling group membership changes.",
+      "basis": [
+        "F",
+        "request"
+      ]
+    },
+    {
+      "id": "history_risk",
+      "kind": "risk",
+      "severity": "critical",
+      "requirement": "Already generated messages and downloaded data cannot simply be unlearned.",
+      "acceptance": "Separate future retrieval denial, stored chat/citation display policy, and information already delivered outside the system.",
+      "basis": [
+        "request",
+        "F"
+      ]
+    },
+    {
+      "id": "write_escalation",
+      "kind": "risk",
+      "severity": "critical",
+      "requirement": "Read sharing must not confer write/delete through a recipient-owned object.",
+      "acceptance": "Respect the file-owner checks in the helper; propose a negative test for attaching read-only shared content to writable knowledge/model objects.",
+      "basis": [
+        "F"
+      ]
+    },
+    {
+      "id": "negative_tests",
+      "kind": "task",
+      "severity": "major",
+      "requirement": "Verify grant/revoke behavior across principals and paths.",
+      "acceptance": "Include direct and group grants, changed group membership, surviving grants, unauthorized citations/retrieval and permitted owner behavior.",
+      "basis": [
+        "F",
+        "request"
+      ]
+    },
+    {
+      "id": "cache_unknown",
+      "kind": "unknown",
+      "severity": "major",
+      "requirement": "Whether a permission-sensitive retrieval/semantic cache exists is not established by this packet.",
+      "acceptance": "Explicitly mark unknown and specify conditional inspection/invalidation only if relevant caching is found. Do not require Redis implementation.",
+      "basis": [
+        "request",
+        "F",
+        "K"
+      ]
+    },
+    {
+      "id": "rollout",
+      "kind": "task",
+      "severity": "major",
+      "requirement": "Preserve access semantics for existing resources during rollout.",
+      "acceptance": "Plan compatibility checks or migration if needed, together with rollback/feature gating; an unnecessary schema migration is not required for credit.",
+      "basis": [
+        "F",
+        "request"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "before": "principal_policy",
+      "after": "retrieval_auth",
+      "severity": "critical",
+      "reason": "Authorization behavior needs the chosen rights and effective-access contract."
+    },
+    {
+      "before": "revoke_policy",
+      "after": "revoke_paths",
+      "severity": "critical",
+      "reason": "Revocation enforcement must implement an explicit consistency boundary."
+    },
+    {
+      "before": "retrieval_auth",
+      "after": "negative_tests",
+      "severity": "major",
+      "reason": "End-to-end acceptance requires the retrieval enforcement being exercised."
+    },
+    {
+      "before": "revoke_paths",
+      "after": "negative_tests",
+      "severity": "major",
+      "reason": "End-to-end revocation acceptance requires the enforcement being exercised."
+    }
+  ],
+  "author_review": "Cross-path rights already exist. A stale helper docstring says direct ownership is not checked, while its implementation does check it; prefer code. Cache absence is NOT proven. Dependencies are acceptance-level prerequisites, not a demand that test authoring wait. These are development obligations, not exhaustive independent gold."
+}
