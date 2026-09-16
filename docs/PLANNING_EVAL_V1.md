@@ -1,162 +1,108 @@
 # Planning Eval v1
 
-## Purpose
+Planning Eval v1 answers one question: **does a generated plan cover the important work and reasoning without inventing facts, and does it expose the dependencies and uncertainty a reviewer needs?**
 
-Planning Eval v1 measures the quality of a plan produced from a fixed project context and change request. It does not evaluate visual presentation, execution, coding quality, or agent autonomy.
+It does not evaluate visual UX, execution, coding quality, latency, cost, or agent autonomy.
 
-The primary question is: **does the plan cover the important work and reasoning, avoid unsupported claims, and express useful dependencies and uncertainty?**
+## What v1 measures
 
-## Frozen evaluation axes
-
-1. **Coverage** — important outcomes, work, decisions, risks, and impacts are present.
-2. **Correctness** — assertions and proposed work are compatible with supplied evidence.
-3. **Impact** — materially affected domains/components/actors/data paths are identified.
-4. **Dependency** — required ordering/decision/information relationships are represented correctly.
-5. **Granularity** — plan units are neither unusably broad nor pointlessly fragmented.
-6. **Decision** — unresolved human/product/architecture decisions are separated from implementation work.
-7. **Risk** — material failure, security, compatibility, migration, and operational concerns are surfaced.
-8. **Uncertainty** — unknown or contradictory facts are not promoted to certainty.
-9. **Traceability** — important plan items can be traced to an outcome, impact, decision, risk, or evidence source.
-
-No single aggregate score is normative in v1. Report the axes and severe errors separately.
+- **Coverage**: required outcomes, tasks, decisions, risks, and impacts are present.
+- **Correctness**: claims are compatible with supplied evidence.
+- **Dependency**: required ordering/decision relationships are present and not reversed.
+- **Uncertainty**: unknown facts stay unknown; silence is not abstention.
+- **Granularity**: only review-critical grouping/splitting constraints are judged. Exact task counts are never canonical.
 
 ## Severity
 
-- **critical** — omission/error can invalidate the plan, create a serious safety/security/data/correctness failure, or make downstream work materially wrong.
-- **major** — materially reduces completeness or executability but does not invalidate the whole plan.
-- **minor** — useful quality improvement with limited effect on the plan's core validity.
+- `critical`: omission/error can invalidate the plan or cause serious security, data, or correctness failure.
+- `major`: materially reduces completeness or executability.
+- `minor`: useful improvement with limited effect on core validity.
 
-Severity belongs to the reference assertion, not to wording or model confidence.
+Critical misses are reported separately in v1. They do not become a hard pass/fail gate until baseline data justifies a threshold.
+
+## Reference model
+
+A reference case is a **constraint graph, not a canonical task list**. It contains only obligations that matter to review:
+
+```yaml
+nodes:
+  - id: permission_policy
+    kind: decision
+    concept: permission policy
+    severity: critical
+    aliases: []
+  - id: retrieval_authorization
+    kind: task
+    concept: retrieval authorization
+    severity: critical
+    aliases: [authorize retrieval against document permissions]
+edges:
+  - from: permission_policy
+    to: retrieval_authorization
+    relation: requires_decision
+    severity: critical
+unknowns:
+  - concept: cache existence
+    severity: major
+```
+
+Candidate plans may group or split work differently if the required obligation remains explicit enough to review.
 
 ## Error taxonomy
 
+Keep the first version small:
+
 - `MISS_CRITICAL`, `MISS_MAJOR`, `MISS_MINOR`
-- `FALSE_IMPACT` — claims a material impact unsupported by context or reference policy.
-- `UNSUPPORTED_CLAIM` — presents an unestablished architecture/system fact as fact.
-- `FALSE_CERTAINTY` — fails to preserve a required unknown/contradiction.
-- `BAD_DEPENDENCY` — asserts a dependency that is materially wrong.
-- `MISSING_DEPENDENCY` — misses a required dependency.
-- `UNDER_DECOMPOSITION` — a plan unit is too broad to review or reason about at the required level.
-- `OVER_DECOMPOSITION` — fragmentation adds noise without useful planning information.
 - `MISSING_DECISION`, `MISSING_RISK`
-- `DUPLICATE_PLAN_ITEM`
-- `UNTRACEABLE_PLAN_ITEM`
+- `FALSE_CERTAINTY`
+- `BAD_DEPENDENCY`, `MISSING_DEPENDENCY`
+- `UNDER_DECOMPOSITION`, `OVER_DECOMPOSITION` (human/semantic review only in v1)
 
-## Reference Plan Graph
+Do not add a new error code until a real reference case requires it.
 
-A reference case is a **constraint graph, not a single canonical task list**. Alternative decompositions may be valid.
+## Evaluation layers
 
-Minimum node fields:
+1. **Deterministic**: schema/invariant checks and controlled exact/alias self-tests.
+2. **Semantic**: future versioned matcher for paraphrases; it must be allowed to abstain.
+3. **Human**: ambiguous equivalence, granularity, contested dependencies, and novel findings.
 
-```yaml
-id: retrieval_authorization
-kind: task            # outcome | task | decision | risk | unknown | deliverable
-concept: retrieval authorization
-severity: critical    # critical | major | minor
-required: true
-acceptable_aliases:
-  - authorize retrieval against document permissions
-```
-
-Minimum edge fields:
-
-```yaml
-from: permission_policy
-to: retrieval_authorization
-relation: requires_decision
-severity: critical
-required: true
-```
-
-Unknown constraints:
-
-```yaml
-- concept: cache existence
-  expected_state: unknown
-  severity: major
-```
-
-A candidate is not penalized merely because it groups/splits tasks differently. Evaluation should match semantic obligations and required relationships rather than exact node counts.
-
-## Three evaluation layers
-
-### Layer 1 — deterministic
-
-Code must own checks that do not require judgment: schema validity, duplicate IDs, dangling edges, forbidden cycles for hard execution dependencies, missing required fields, and structural traceability when explicit links exist.
-
-### Layer 2 — semantic
-
-Semantic matching determines whether candidate language satisfies a reference obligation despite wording differences. This layer must return match evidence and may abstain. An LLM judge, if used, is a fallible judge and must be versioned and audited against human labels.
-
-### Layer 3 — human/expert
-
-Humans adjudicate ambiguous equivalence, granularity, contested dependencies, severity, and novel valid findings not represented in the reference. Blind-set quality claims require human adjudication until judge reliability is demonstrated.
-
-## Matching principles
-
-- Match concepts, not strings.
-- Allow one candidate node to satisfy multiple tightly coupled reference obligations only when its content explicitly covers them.
-- Allow multiple candidate nodes to satisfy one reference obligation without awarding extra credit.
-- Novel findings are not automatically false positives; they enter an `unadjudicated_novel` bucket until evidence/human review.
-- Unsupported claims and explicit uncertainty are different outcomes.
-- Silence is not abstention.
-- A candidate cannot receive uncertainty credit if it simultaneously asserts the same fact as established.
+Novel findings are neither rewarded nor penalized until adjudicated.
 
 ## Scorecard
 
-Report at minimum:
+Report dimensions separately; no composite score in v1:
 
-- critical coverage
-- major coverage
-- minor coverage
-- decision recall
-- risk recall
-- impact coverage
-- required dependency recall
-- bad dependency count
-- unsupported claim count
-- uncertainty/abstention accuracy
-- under/over-decomposition findings
-- untraceable item count
-- unadjudicated novel findings
-
-Do not collapse these into a single leaderboard score in v1.
-
-## Eval versioning
-
-An evaluation release freezes together:
-
-1. dataset inputs;
-2. reference graphs/assertions;
-3. scoring semantics;
-4. semantic-judge configuration, if any;
-5. baseline prompts/protocols.
-
-Changing a frozen item creates a new eval version. Historical results retain their original eval version.
+- critical / major / minor coverage
+- decision and risk recall
+- required dependency recall and bad dependency count
+- false-certainty count
+- unresolved novel findings
 
 ## Baselines
 
-Every quality claim compares the same model/context against at least:
+Freeze the same context/model for:
 
-- `plain` — direct planning request;
-- `strong_one_shot` — one carefully structured prompt;
-- `decomposion` — staged planning method under test.
+- `plain`: direct planning request
+- `strong_one_shot`: one carefully structured prompt
+- `decomposion`: staged method under test
 
-Additional published planning/decomposition methods may be added as baselines, but must not receive extra context unavailable to the other strategies.
+## Versioning
 
-## Self-test requirement
+An eval version freezes dataset inputs, reference constraints, scoring semantics, semantic-judge configuration (when introduced), and baseline prompts. Changing one creates a new eval version.
 
-Before creating a large Golden Set, the evaluator must prove that it distinguishes controlled mutations of a small reference plan:
+## Step 1 gate
 
-- remove a critical obligation -> critical miss;
-- convert an unknown into a fact -> false certainty/unsupported claim;
-- reverse a required dependency -> bad/missing dependency;
-- collapse a deliberately review-critical unit -> under-decomposition;
-- split a trivial unit into redundant fragments -> over-decomposition;
-- preserve an equivalent paraphrase -> no miss.
+Before Step 2, controlled tests must prove at least:
 
-If these tests cannot be expressed and pass reliably, the evaluator is not ready for Step 2 Golden authoring.
+- critical omission is detected;
+- explicit alias is accepted;
+- unknown promoted to fact is detected;
+- silence does not count as abstention;
+- reversed required dependency is detected;
+- novel findings are left unadjudicated.
 
-## Explicit non-goals
+## Anti-overengineering rule
 
-Planning Eval v1 does not measure graph aesthetics, human review time, coding success, execution success, token cost, latency, or business value. Those require separate evaluations.
+**No new module, schema field, metric, document, or abstraction unless a concrete reference case or evaluator failure requires it.** At every step review, ask what can be deleted or merged before asking what can be added.
+
+Defaults for Step 2: critical coverage must be explicit; granularity uses only `must-separate` style constraints when needed; critical misses remain separately visible; novel findings require adjudication; the first three cases are development cases and do not prove generalization.
