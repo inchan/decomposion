@@ -14,10 +14,14 @@ dev = ["pytest==8.4.2"]
 
 [project.scripts]
 decomposion = "decomposion_lab.cli:main"
+planning-eval = "planning_eval.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["eval_harness*", "decomposion_lab*"]
+include = ["eval_harness*", "decomposion_lab*", "planning_eval*"]
 exclude = ["tests*", "golden*", "experiments*"]
+
+[tool.setuptools.package-data]
+planning_eval = ["VERSION"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

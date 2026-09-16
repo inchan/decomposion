@@ -34,6 +34,7 @@ jobs:
           python -m pip check
           decomposion --version
           decomposion doctor
+          planning-eval selftest
       - name: Validate cases and experiment manifest
         run: |
           python -m eval_harness.cli --golden-dir golden
@@ -49,7 +50,8 @@ jobs:
           "$RUNNER_TEMP/wheel-check/bin/python" -m pip install "$RUNNER_TEMP"/wheels/*.whl
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/wheel-check/bin/decomposion" --version
-          "$RUNNER_TEMP/wheel-check/bin/python" -c "import eval_harness.matrix, decomposion_lab.core"
+          "$RUNNER_TEMP/wheel-check/bin/planning-eval" selftest
+          "$RUNNER_TEMP/wheel-check/bin/python" -c "import eval_harness.matrix, decomposion_lab.core, planning_eval.evaluator"
       - name: Publish fixture summary
         if: ${{ always() }}
         run: |
