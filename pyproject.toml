@@ -19,6 +19,9 @@ decomposion = "decomposion_lab.cli:main"
 include = ["eval_harness*", "decomposion_lab*", "planning_eval*"]
 exclude = ["tests*", "golden*", "experiments*"]
 
+[tool.setuptools.package-data]
+planning_eval = ["VERSION"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
