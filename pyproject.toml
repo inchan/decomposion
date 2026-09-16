@@ -16,7 +16,7 @@ dev = ["pytest==8.4.2"]
 decomposion = "decomposion_lab.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["eval_harness*", "decomposion_lab*"]
+include = ["eval_harness*", "decomposion_lab*", "planning_eval*"]
 exclude = ["tests*", "golden*", "experiments*"]
 
 [tool.pytest.ini_options]
