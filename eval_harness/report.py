@@ -26,6 +26,10 @@ def markdown_report(results: list[StrategyResult]) -> str:
     lines = [
         "# Decomposion Evaluation Matrix",
         "",
+        "FIXTURE ONLY — wiring/scorer verification, not model quality."
+        if results and all(r.metadata.get("provider") == "fixture" for r in results)
+        else "Concept-ID scores require independent semantic/evidence review; they are not proof of correctness.",
+        "",
         "| Strategy | Recall | Forbidden rate | Abstention accuracy |",
         "|---|---:|---:|---:|",
     ]

@@ -1,5 +1,5 @@
-experiment_id: open-webui-change-impact-v1
-version: 1
+experiment_id: open-webui-change-impact-v2
+version: 2
 target:
   repository: open-webui/open-webui
   clone_url: https://github.com/open-webui/open-webui.git
@@ -15,15 +15,18 @@ protocol:
   implementation_required: false
   repository_mutation_allowed: false
   notes: >-
-    The first experiment measures planning/change-impact reasoning only. Agents must inspect
-    the pinned repository but must not implement the requested changes.
+    Planning/static analysis only. Plain and structured use one recorded stage;
+    decomposion uses four separately recorded stages. No provider is invoked by the lab.
 outputs:
-  root: .experiment-results/open-webui
+  root: runs
+  relative_to: explicit_workspace
   required_per_run:
     - answer.md
     - metadata.json
 controls:
   same_model_across_strategies: true
   fresh_agent_session_per_run: true
+  fresh_agent_session_per_stage: true
   no_cross_run_memory: true
   record_model_and_agent_version: true
+  operator_supplied_model_metadata: true

@@ -1,16 +1,23 @@
+[build-system]
+requires = ["setuptools==82.0.1"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "decomposion-eval"
-version = "0.1.0"
-description = "Evaluation harness for Decomposion golden-set reasoning tests"
+version = "0.2.0.dev0"
+description = "Provider-free experiment lab and evaluation harness for Decomposion"
 requires-python = ">=3.11"
-dependencies = [
-  "PyYAML>=6.0,<7",
-]
+dependencies = ["PyYAML==6.0.3"]
 
 [project.optional-dependencies]
-dev = [
-  "pytest>=8.0,<9",
-]
+dev = ["pytest==8.4.2"]
+
+[project.scripts]
+decomposion = "decomposion_lab.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["eval_harness*", "decomposion_lab*"]
+exclude = ["tests*", "golden*", "experiments*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
