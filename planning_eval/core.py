@@ -209,6 +209,9 @@ def evaluate(case: dict, plan: dict, review: dict | None = None) -> dict:
         raise ValueError("review is stale or belongs to another case/plan")
     if review.get("reviewer_kind") not in {"unassigned", "human", "llm", "fixture"}:
         raise ValueError("invalid reviewer_kind")
+    reviewer = review.get("reviewer")
+    assigned = (review["reviewer_kind"] != "unassigned" and isinstance(reviewer, str)
+                and bool(reviewer.strip()) and reviewer.strip() != "UNASSIGNED")
     rows = records(review.get("judgments"), "judgments")
     if len(rows) != len(obligations) or {r.get("obligation") for r in rows} != set(obligations):
         raise ValueError("review must cover every obligation exactly once")
@@ -219,7 +222,7 @@ def evaluate(case: dict, plan: dict, review: dict | None = None) -> dict:
             raise ValueError("invalid review verdict")
         support = records(row.get("support"), "support")
         if verdict != "unresolved":
-            if review["reviewer_kind"] == "unassigned" or review.get("reviewer") in {None, "", "UNASSIGNED"}:
+            if not assigned:
                 raise ValueError("assigned reviewer required")
             text(row.get("reason"), "judgment.reason")
         if verdict in {"met", "contradicted"} and not support:
@@ -245,24 +248,35 @@ def evaluate(case: dict, plan: dict, review: dict | None = None) -> dict:
     for issue in records(review.get("plan_issues", []), "plan_issues"):
         if issue.get("code") not in ISSUE_CODES or issue.get("severity") not in SEVERITIES:
             raise ValueError("invalid reviewed plan issue")
-        if review["reviewer_kind"] == "unassigned":
+        if not assigned:
             raise ValueError("assigned reviewer required for plan issues")
         text(issue.get("reason"), "issue.reason")
         if not strings(issue.get("nodes"), "issue.nodes") or not set(issue["nodes"]) <= set(nodes):
             raise ValueError("reviewed issue requires existing nodes")
         findings.append(dict(issue))
-    pairs = [(e["from"], e["to"]) for e in plan["edges"] if e["relation"] == "precedes"]
+    # Invalid edges remain findings, but cannot act as bridges through absent nodes.
+    pairs = [(e["from"], e["to"]) for e in plan["edges"]
+             if e["relation"] == "precedes" and e["from"] in nodes and e["to"] in nodes
+             and e["from"] != e["to"]]
     dep_met, dep_pending = 0, 0
     for edge in case.get("dependencies", []):
         before, after = edge["before"], edge["after"]
-        if any(verdicts[k] == "unresolved" for k in (before, after)):
+        if any(verdicts[k] in {"missing", "contradicted"} for k in (before, after)):
+            # A known unsatisfied endpoint takes precedence over incomplete review.
+            code = "MISSING_DEPENDENCY"
+        elif any(verdicts[k] == "unresolved" for k in (before, after)):
             dep_pending += 1
-        elif any(reachable(a, b, pairs) for a in matches[before] for b in matches[after] if a != b):
-            dep_met += 1
+            continue
         else:
             reverse = any(reachable(b, a, pairs) for a in matches[before] for b in matches[after] if a != b)
-            findings.append({"code": "BAD_DEPENDENCY" if reverse else "MISSING_DEPENDENCY",
-                             "severity": edge["severity"], "before": before, "after": after})
+            forward = any(reachable(a, b, pairs) for a in matches[before] for b in matches[after] if a != b)
+            # Bidirectional reachability is contradictory precedence, not fulfillment.
+            if forward and not reverse:
+                dep_met += 1
+                continue
+            code = "BAD_DEPENDENCY" if reverse else "MISSING_DEPENDENCY"
+        findings.append({"code": code, "severity": edge["severity"],
+                         "before": before, "after": after})
     def coverage(ids):
         counts = Counter(verdicts[i] for i in ids)
         total, met, pending = len(ids), counts["met"], counts["unresolved"]
