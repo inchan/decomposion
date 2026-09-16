@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "id": "P10",
+  "status": "development_unvalidated",
+  "target": {
+    "repository": "open-webui/open-webui",
+    "commit": "0a7c15832fb30b1903753e83f81dc7d27e5b0944"
+  },
+  "change": "Add an enterprise audit mode recording important user and administrator actions and allowing authorized auditors to search them. Storage, retention, tenant model, export format and compliance standard are deliberately unspecified. Inspect existing audit support and distinguish facts, proposals, unknowns and required decisions. Plan only.",
+  "sources": [
+    {
+      "id": "L",
+      "path": "backend/open_webui/utils/audit.py",
+      "blob": "7354b2c64130af87ef04fc614f7f378a220e9d07",
+      "start": 1,
+      "end": 200,
+      "anchor": "class AuditLoggingMiddleware:"
+    },
+    {
+      "id": "U",
+      "path": "backend/open_webui/routers/users.py",
+      "blob": "d736c038bcfe56d297c0441c7bb9e034b70c854b",
+      "start": 1035,
+      "end": 1090,
+      "anchor": "# Prevent self-deletion"
+    }
+  ],
+  "obligations": [
+    {
+      "id": "audit_outcome",
+      "kind": "outcome",
+      "severity": "major",
+      "requirement": "Authorized auditors can find meaningful, scoped action records.",
+      "acceptance": "Describe useful search and recording outcomes without equating HTTP logging with a complete compliance solution.",
+      "basis": [
+        "request"
+      ]
+    },
+    {
+      "id": "existing_audit",
+      "kind": "impact",
+      "severity": "major",
+      "requirement": "Extend or integrate existing AuditLoggingMiddleware, levels and structured entries.",
+      "acceptance": "Recognize NONE/METADATA/REQUEST/REQUEST_RESPONSE and the existing logger rather than building on an assumed absence.",
+      "basis": [
+        "L"
+      ]
+    },
+    {
+      "id": "event_scope",
+      "kind": "decision",
+      "severity": "critical",
+      "requirement": "Define which successful and failed user/admin actions matter.",
+      "acceptance": "Choose event semantics, actor/subject/outcome/correlation and gaps between HTTP requests and business actions.",
+      "basis": [
+        "L",
+        "U",
+        "request"
+      ]
+    },
+    {
+      "id": "read_coverage",
+      "kind": "impact",
+      "severity": "major",
+      "requirement": "Coverage depends on audited HTTP methods, path rules and non-HTTP paths.",
+      "acceptance": "Notice default write methods and optional GET; investigate background/non-HTTP actions instead of claiming middleware covers them.",
+      "basis": [
+        "L"
+      ]
+    },
+    {
+      "id": "sensitive_bodies",
+      "kind": "risk",
+      "severity": "critical",
+      "requirement": "Request/response-body auditing can record sensitive information.",
+      "acceptance": "Explicitly address content/secrets/PII minimization or redaction, truncation and safe defaults. Do not label all body capture safe.",
+      "basis": [
+        "L"
+      ]
+    },
+    {
+      "id": "audit_access",
+      "kind": "task",
+      "severity": "critical",
+      "requirement": "Enforce least-privilege search/export access and scope.",
+      "acceptance": "Plan server-side authorization and scope filtering with negative tests; do not treat UI hiding as a sufficient control.",
+      "basis": [
+        "request"
+      ]
+    },
+    {
+      "id": "storage_policy",
+      "kind": "decision",
+      "severity": "major",
+      "requirement": "Choose storage, retention, deletion/export and failure policies.",
+      "acceptance": "Separate existing Loguru emission from proposed searchable/durable storage; leave unspecified retention and deployment settings open.",
+      "basis": [
+        "L",
+        "request"
+      ]
+    },
+    {
+      "id": "search_storage",
+      "kind": "task",
+      "severity": "major",
+      "requirement": "Provide searchable records according to the selected data contract.",
+      "acceptance": "Plan ingestion/indexing/search interfaces, migration/compatibility and bounded operational load without mandating Kafka or a vendor.",
+      "basis": [
+        "request",
+        "L"
+      ]
+    },
+    {
+      "id": "audit_integrity",
+      "kind": "risk",
+      "severity": "critical",
+      "requirement": "Dropped, duplicated or alterable audit events can undermine review.",
+      "acceptance": "State durability/tamper-evidence and outage/duplicate handling as requirements or decisions, not pre-existing guarantees.",
+      "basis": [
+        "request",
+        "L"
+      ]
+    },
+    {
+      "id": "audit_tests",
+      "kind": "task",
+      "severity": "major",
+      "requirement": "Test coverage, authorization, sensitive content and failures.",
+      "acceptance": "Include disabled/enabled levels, GET/path configuration, access denial, body bounds and logging/search failure behavior.",
+      "basis": [
+        "L",
+        "request"
+      ]
+    },
+    {
+      "id": "compliance_unknown",
+      "kind": "unknown",
+      "severity": "major",
+      "requirement": "No compliance standard or retention period was supplied.",
+      "acceptance": "Explicitly decline to claim compliance/certification or invent a binding retention period.",
+      "basis": [
+        "request"
+      ]
+    },
+    {
+      "id": "tenant_unknown",
+      "kind": "unknown",
+      "severity": "major",
+      "requirement": "The target deployment's tenant model and auditor scope are not established.",
+      "acceptance": "State the scope decision is unresolved; do not infer multi-tenancy from the word enterprise.",
+      "basis": [
+        "request"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "before": "event_scope",
+      "after": "search_storage",
+      "severity": "major",
+      "reason": "The searchable event contract depends on event semantics."
+    },
+    {
+      "before": "storage_policy",
+      "after": "search_storage",
+      "severity": "major",
+      "reason": "Persistence/search behavior depends on the chosen storage/retention contract."
+    },
+    {
+      "before": "audit_access",
+      "after": "audit_tests",
+      "severity": "critical",
+      "reason": "Security acceptance must exercise the access enforcement."
+    }
+  ],
+  "author_review": "Existing audit code proves capabilities, not that auditing is enabled or configured safely in a deployment. Redis or Kafka may exist elsewhere; the invalid assertion is a requirement to use an unverified audit backend. No compliance advice or certification verdict is encoded."
+}

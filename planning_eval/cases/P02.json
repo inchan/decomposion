@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "id": "P02",
+  "status": "development_unvalidated",
+  "target": {
+    "repository": "open-webui/open-webui",
+    "commit": "0a7c15832fb30b1903753e83f81dc7d27e5b0944"
+  },
+  "change": "Add self-service account deletion for users who may own chats, uploaded files, knowledge, shared resources and API credentials. Some records may need retention. Preserve other users' valid access and avoid partial deletion leaving unsafe access. Produce a reviewable change plan, not an implementation.",
+  "sources": [
+    {
+      "id": "U",
+      "path": "backend/open_webui/routers/users.py",
+      "blob": "d736c038bcfe56d297c0441c7bb9e034b70c854b",
+      "start": 1035,
+      "end": 1090,
+      "anchor": "# Prevent self-deletion"
+    },
+    {
+      "id": "M",
+      "path": "backend/open_webui/models/users.py",
+      "blob": "b7633759f5a6c7f1cdccc3ed25a3156a362987c9",
+      "start": 700,
+      "end": 780,
+      "anchor": "async def delete_user_by_id("
+    },
+    {
+      "id": "A",
+      "path": "backend/open_webui/models/auths.py",
+      "blob": "629c5eb6c548a883e89dfcf28cbe0d4a2e77c2ec",
+      "start": 225,
+      "end": 242,
+      "anchor": "async def delete_auth_by_id("
+    },
+    {
+      "id": "K",
+      "path": "backend/open_webui/routers/knowledge.py",
+      "blob": "3b58c6f805588ff23ef2ea613ed2a3260c978f75",
+      "start": 1,
+      "end": 85,
+      "anchor": "async def delete_file_resource("
+    },
+    {
+      "id": "F",
+      "path": "backend/open_webui/utils/access_control/files.py",
+      "blob": "efc8b112221eb089f9881d5c66d3a253af5a69bb",
+      "start": 1,
+      "end": 140,
+      "anchor": "async def has_access_to_file("
+    }
+  ],
+  "obligations": [
+    {
+      "id": "deletion_outcome",
+      "kind": "outcome",
+      "severity": "major",
+      "requirement": "A user can safely request and complete deletion subject to an explicit retention/ownership policy.",
+      "acceptance": "State completion and pending/retained outcomes instead of equating a deleted User row with full completion.",
+      "basis": [
+        "request"
+      ]
+    },
+    {
+      "id": "existing_delete",
+      "kind": "impact",
+      "severity": "major",
+      "requirement": "Existing admin deletion is not the requested self-service workflow.",
+      "acceptance": "Recognize primary-admin protection, get_admin_user and explicit self-deletion refusal; do not simply expose the admin endpoint.",
+      "basis": [
+        "U"
+      ]
+    },
+    {
+      "id": "eligibility",
+      "kind": "decision",
+      "severity": "critical",
+      "requirement": "Define authenticated self-service confirmation and protected-admin behavior.",
+      "acceptance": "Decide request authorization/reconfirmation and first/last-admin handling without silently removing safeguards.",
+      "basis": [
+        "U",
+        "request"
+      ]
+    },
+    {
+      "id": "ownership",
+      "kind": "decision",
+      "severity": "critical",
+      "requirement": "Decide transfer, deletion or retention of shared owned resources.",
+      "acceptance": "Distinguish ownership from membership/grants and preserve other users' legitimate data/access; do not invent a tenant schema.",
+      "basis": [
+        "F",
+        "M",
+        "request"
+      ]
+    },
+    {
+      "id": "retention",
+      "kind": "decision",
+      "severity": "critical",
+      "requirement": "Separate deletion obligations from retained records and their access rules.",
+      "acceptance": "Make retention/legal/business policy an explicit unresolved decision where unspecified; do not invent a retention period or certification.",
+      "basis": [
+        "request"
+      ]
+    },
+    {
+      "id": "inventory",
+      "kind": "impact",
+      "severity": "major",
+      "requirement": "Inventory identity, groups, chats, files, knowledge, vector collections and physical storage.",
+      "acceptance": "Tie the inventory to the shown deletion calls; inspect unshown cascades rather than claiming all objects are automatically deleted.",
+      "basis": [
+        "M",
+        "A",
+        "K",
+        "F"
+      ]
+    },
+    {
+      "id": "credentials",
+      "kind": "task",
+      "severity": "critical",
+      "requirement": "Prevent continued use of credentials after the defined deletion boundary.",
+      "acceptance": "Cover API credentials and applicable session/token/OAuth paths, inspecting those not established by this packet.",
+      "basis": [
+        "M",
+        "A",
+        "request"
+      ]
+    },
+    {
+      "id": "partial_failure",
+      "kind": "risk",
+      "severity": "critical",
+      "requirement": "Deletion spans group removal, chat/user/auth data and physical/vector resources.",
+      "acceptance": "Identify partial failure and retry/idempotency needs; do not assume that a docstring describing one transaction proves distributed atomicity.",
+      "basis": [
+        "A",
+        "M",
+        "K"
+      ]
+    },
+    {
+      "id": "safe_delete",
+      "kind": "task",
+      "severity": "critical",
+      "requirement": "Implement the policy-aware deletion workflow with verifiable completion.",
+      "acceptance": "Plan ordered or atomic handling as supported, idempotency, status/retry and postconditions. No specific queue/vendor is required.",
+      "basis": [
+        "request",
+        "A",
+        "M",
+        "K"
+      ]
+    },
+    {
+      "id": "deletion_tests",
+      "kind": "task",
+      "severity": "major",
+      "requirement": "Test rejected, retried, partly failed and completed deletions.",
+      "acceptance": "Include protected administrators, retained/shared resources, remaining credentials and failure between cleanup steps.",
+      "basis": [
+        "U",
+        "M",
+        "K",
+        "request"
+      ]
+    },
+    {
+      "id": "backup_unknown",
+      "kind": "unknown",
+      "severity": "major",
+      "requirement": "Backup and external-system erasure/retention behavior is unspecified.",
+      "acceptance": "Mark unresolved and require investigation; do not assume Stripe, a backup provider, or a fixed retention schedule.",
+      "basis": [
+        "request"
+      ]
+    },
+    {
+      "id": "org_unknown",
+      "kind": "unknown",
+      "severity": "major",
+      "requirement": "Groups shown in the code do not alone establish a tenant/organization isolation model.",
+      "acceptance": "Explicitly distinguish evidenced groups from unverified organization ownership and tenant boundaries.",
+      "basis": [
+        "M",
+        "F"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "before": "eligibility",
+      "after": "safe_delete",
+      "severity": "critical",
+      "reason": "Destructive behavior must respect the authorized/protected-account policy."
+    },
+    {
+      "before": "ownership",
+      "after": "safe_delete",
+      "severity": "critical",
+      "reason": "Destruction must not precede the decision about shared ownership."
+    },
+    {
+      "before": "retention",
+      "after": "safe_delete",
+      "severity": "critical",
+      "reason": "Deletion behavior depends on retained-data policy."
+    },
+    {
+      "before": "safe_delete",
+      "after": "deletion_tests",
+      "severity": "major",
+      "reason": "Completion is accepted after testing the implemented workflow, not merely writing tests."
+    }
+  ],
+  "author_review": "Auth.delete_auth_by_id says one transaction, but Users.delete_user_by_id calls Groups removal outside the passed db and commits user/chat work. Do not overclaim rollback guarantees. Remaining cascades and external cleanup need inspection; no claim of a confirmed production vulnerability is made."
+}

@@ -1,0 +1,11 @@
+{
+  "endpoint": "http://127.0.0.1:8000/v1/chat/completions",
+  "model": "REPLACE_WITH_EXACT_SERVED_MODEL_ID",
+  "key_env": null,
+  "request_options": {
+    "max_tokens": 4096,
+    "temperature": 0
+  },
+  "timeout_seconds": 120,
+  "environment": "local"
+}

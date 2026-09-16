@@ -38,6 +38,8 @@ jobs:
         run: |
           python -m eval_harness.cli --golden-dir golden
           decomposion check-suite
+          planning-eval check
+          planning-eval selftest
       - name: Run deterministic and offline Git integration tests
         run: python -m pytest --junitxml=test-results.xml
       - name: Run fixture-only baseline matrix
@@ -49,7 +51,9 @@ jobs:
           "$RUNNER_TEMP/wheel-check/bin/python" -m pip install "$RUNNER_TEMP"/wheels/*.whl
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/wheel-check/bin/decomposion" --version
-          "$RUNNER_TEMP/wheel-check/bin/python" -c "import eval_harness.matrix, decomposion_lab.core"
+          "$RUNNER_TEMP/wheel-check/bin/planning-eval" check
+          "$RUNNER_TEMP/wheel-check/bin/planning-eval" selftest
+          "$RUNNER_TEMP/wheel-check/bin/python" -c "import eval_harness.matrix, decomposion_lab.core, planning_eval.experiment"
       - name: Publish fixture summary
         if: ${{ always() }}
         run: |
@@ -84,5 +88,11 @@ jobs:
             --run P01-plain-r01 --agent codex --agent-version fixture-not-invoked \
             --model fixture-not-invoked --thinking fixed --execution-environment cloud
           .venv/bin/decomposion lab status --workspace "$RUNNER_TEMP/open-webui-lab"
+      - name: Verify reference evidence and prepare bounded experiment
+        run: |
+          .venv/bin/planning-eval prepare --repo "$RUNNER_TEMP/open-webui-lab/target" --out "$RUNNER_TEMP/planning-packet.json"
+          .venv/bin/planning-eval run --packet "$RUNNER_TEMP/planning-packet.json" \
+            --config experiments/planning-model.example.json --out "$RUNNER_TEMP/not-executed" --max-calls 21
+          test ! -d "$RUNNER_TEMP/not-executed"
       - name: Explain scope
-        run: echo 'Real source clone/setup verified. No application, coding agent, GPU model or paid API was run.' >> "$GITHUB_STEP_SUMMARY"
+        run: echo 'Real source/blob/range verification and experiment dry run passed. No target code or model was executed.' >> "$GITHUB_STEP_SUMMARY"
