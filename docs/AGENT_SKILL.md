@@ -12,9 +12,24 @@ We choose a shared Skill over an MCP server or automatic hooks for this iteratio
 it is enough to provide the procedure plus deterministic checks, without an extra
 service or hidden model billing. This does not claim multi-agent or MCP support.
 
-## Install (Git and Python 3.11+, no package installation)
+## Recommended install: skills CLI
 
-Clone this repository at the revision you wish to test. From its root:
+The repository uses the standard `skills/decomposion/SKILL.md` layout, so the open Agent Skills CLI can discover and install it directly from GitHub. The CLI supports both Codex and Claude Code.
+
+```bash
+# Optional: verify discovery first
+npx skills add inchan/decomposion --list
+
+# Install into the current project
+npx skills add inchan/decomposion --skill decomposion -a codex -y
+npx skills add inchan/decomposion --skill decomposion -a claude-code -y
+```
+
+Use the default project scope for the first human test. This keeps the experiment isolated to one repository. Start a fresh agent session after installation. `npx skills list` can be used to confirm the installed skill. The CLI also supports update/remove and global installs, but those are not required for the first test.
+
+## Fallback install (Git and Python 3.11+, no package installation)
+
+If Node/npx is unavailable, clone this repository at the revision you wish to test. From its root:
 
 ```bash
 # Replace /absolute/path/to/project with the repository you plan to inspect.
