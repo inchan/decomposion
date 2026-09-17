@@ -1,0 +1,95 @@
+name: Cloud skill experiment
+
+on:
+  pull_request:
+    paths:
+      - 'skills/decomposion/**'
+      - 'scripts/install_skill.py'
+      - 'scripts/cloud_skill_experiment.py'
+      - '.github/workflows/cloud-skill-experiment.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-skill-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-cpu-pilot:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Install evaluation and verify both skill layouts
+        run: |
+          python -m pip install -e '.[dev]'
+          python -m pytest tests/test_agent_skill.py
+          mkdir -p "$RUNNER_TEMP/skill-project"
+          python scripts/install_skill.py --agent codex --project "$RUNNER_TEMP/skill-project"
+          python scripts/install_skill.py --agent claude --project "$RUNNER_TEMP/skill-project"
+      - name: Prepare the existing evidence packet (no application execution)
+        run: |
+          decomposion lab init --workspace "$RUNNER_TEMP/source-lab" --profile smoke
+          planning-eval prepare --repo "$RUNNER_TEMP/source-lab/target" --out "$RUNNER_TEMP/packet.json"
+      - name: Fetch official pinned runtime and model, verify hashes
+        env:
+          MODEL_REVISION: 2ab9f8f42af02fc212effaef7c4850c885e965f4
+          MODEL_SHA256: cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/llama" "$RUNNER_TEMP/cloud-records"
+          curl --fail --location --max-time 60 https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b10964 -o "$RUNNER_TEMP/cloud-records/runtime-release.json"
+          python - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          release = json.loads((root/'cloud-records/runtime-release.json').read_text())
+          assert release['tag_name'] == 'b10964'
+          assert release['target_commitish'] == 'b29c606e28a01b1bc8c1351026a0fa6e616bf6c4'
+          assets = [a for a in release['assets'] if a['name'] == 'llama-b10964-bin-ubuntu-x64.tar.gz']
+          assert len(assets) == 1, 'CPU runtime asset not found'
+          asset = assets[0]
+          assert asset['digest'].startswith('sha256:')
+          (root/'runtime-url').write_text(asset['browser_download_url'])
+          (root/'runtime-checksum').write_text(asset['digest'][7:] + '  ' + str(root/'runtime.tar.gz') + '\n')
+          PY
+          curl --fail --location --max-time 180 "$(cat "$RUNNER_TEMP/runtime-url")" -o "$RUNNER_TEMP/runtime.tar.gz"
+          sha256sum -c "$RUNNER_TEMP/runtime-checksum"
+          tar -xzf "$RUNNER_TEMP/runtime.tar.gz" -C "$RUNNER_TEMP/llama"
+          curl --fail --location --max-time 600 "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/$MODEL_REVISION/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf" -o "$RUNNER_TEMP/model.gguf"
+          echo "$MODEL_SHA256  $RUNNER_TEMP/model.gguf" | sha256sum -c -
+          echo "$MODEL_REVISION $MODEL_SHA256" > "$RUNNER_TEMP/cloud-records/model-pin.txt"
+      - name: Run six real model calls, retain invalid responses too
+        run: |
+          set -euo pipefail
+          SERVER="$(find "$RUNNER_TEMP/llama" -type f -name llama-server | head -n1)"
+          test -n "$SERVER"
+          export LD_LIBRARY_PATH="$(dirname "$SERVER"):${LD_LIBRARY_PATH:-}"
+          "$SERVER" --model "$RUNNER_TEMP/model.gguf" --alias qwen-coder-smoke \
+            --host 127.0.0.1 --port 8080 --ctx-size 16384 --parallel 1 --threads 4 \
+            > "$RUNNER_TEMP/cloud-records/server.log" 2>&1 &
+          PID=$!
+          trap 'kill "$PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8080/health > /dev/null; then break; fi
+            kill -0 "$PID"
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8080/health
+          python scripts/cloud_skill_experiment.py --packet "$RUNNER_TEMP/packet.json" --out "$RUNNER_TEMP/cloud-records/pilot"
+          echo 'Real public-model CPU pilot completed. Not a Codex/Claude subscription-host quality benchmark.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve raw evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloud-skill-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cloud-records/
+          retention-days: 14
+          if-no-files-found: warn
