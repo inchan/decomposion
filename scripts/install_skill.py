@@ -29,7 +29,7 @@ def install(project: Path, agent: str) -> dict:
                 'files_sha256': {k: hashlib.sha256(v).hexdigest() for k, v in files.items()}}
     files['INSTALL.json'] = (json.dumps(manifest, sort_keys=True, indent=2) + '\n').encode()
     if destination.exists():
-        existing = {str(p.relative_to(destination)): p.read_bytes()
+        existing = {p.relative_to(destination).as_posix(): p.read_bytes()
                     for p in destination.rglob('*') if p.is_file() and not p.is_symlink()}
         if any(p.is_symlink() for p in destination.rglob('*')) or existing != files:
             raise ValueError('existing skill differs; preserve/rename it before installing this version')

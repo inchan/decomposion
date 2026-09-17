@@ -83,7 +83,9 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8080/health
-          python scripts/cloud_skill_experiment.py --packet "$RUNNER_TEMP/packet.json" --out "$RUNNER_TEMP/cloud-records/pilot"
+          python scripts/cloud_skill_experiment.py --packet "$RUNNER_TEMP/packet.json" --out "$RUNNER_TEMP/cloud-records/pilot" \
+            --project "$RUNNER_TEMP/source-lab/target" \
+            --helper "$RUNNER_TEMP/skill-project/.agents/skills/decomposion/scripts/review.py"
           echo 'Real public-model CPU pilot completed. Not a Codex/Claude subscription-host quality benchmark.' >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve raw evidence even on failure
         if: always()

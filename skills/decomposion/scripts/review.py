@@ -73,7 +73,14 @@ def inspect(plan: dict, project: Path) -> tuple[list[dict], list[dict]]:
     return findings, snapshots
 
 
-def markdown(plan: dict, findings: list[dict]) -> str:
+def review_warnings(plan: dict) -> list[dict]:
+    # Delivery diagnostic, not a semantic score or a demand for arbitrary task counts.
+    if not any(n['kind'] == 'task' for n in plan['nodes']):
+        return [{'code': 'NO_TASKS', 'detail': 'No task nodes were supplied. Review whether this is only a requirements outline rather than a decomposed work plan.'}]
+    return []
+
+
+def markdown(plan: dict, findings: list[dict], warnings: list[dict]) -> str:
     nodes = plan['nodes']
     lines = ['# Decomposion plan review', '',
              f"Structural checks: {'INVALID' if findings else 'valid'}. Semantic quality: **not evaluated**.",
@@ -83,6 +90,9 @@ def markdown(plan: dict, findings: list[dict]) -> str:
             lines.append(f"- **{safe(node['id'])} · {node['kind']}**: {safe(node['text'])}")
     if not any(n['kind'] in {'decision', 'risk', 'unknown'} for n in nodes):
         lines.append('No review items were supplied; this is not evidence that no issues exist.')
+    if warnings:
+        lines += ['', '## Delivery cautions (not semantic grades)', '']
+        lines += ['- **' + safe(w['code']) + '**: ' + safe(w['detail']) for w in warnings]
     if findings:
         lines += ['', '## Structural findings', '']
         lines += ['- ' + safe(json.dumps(f, ensure_ascii=False, sort_keys=True)) for f in findings]
@@ -101,6 +111,10 @@ def markdown(plan: dict, findings: list[dict]) -> str:
         lines.append('| ' + ' | '.join(safe(v) for v in (ids[n['id']], n['id'], n.get('domain', 'unspecified'), n['kind'] + ' / ' + n['state'], n['text'], ', '.join(n.get('evidence', [])))) + ' |')
     lines += ['', '## Relationships (text fallback)', '', '| From | Relation | To |', '|---|---|---|']
     lines += ['| ' + ' | '.join(safe(e[k]) for k in ('from', 'relation', 'to')) + ' |' for e in plan['edges']]
+    lines += ['', '## Evidence index', '', '| Source ID | File | Lines |', '|---|---|---|',
+              '| request | Explicit change request (not an architecture source) | N/A |']
+    lines += ['| ' + ' | '.join(safe(v) for v in (s['id'], s['path'], f"{s['start']}-{s['end']}")) + ' |'
+              for s in plan.get('sources', [])]
     lines += ['', 'Evidence paths/ranges are checked for existence; semantic entailment, completeness and business decisions remain review judgments.', '']
     return '\n'.join(lines)
 
@@ -113,15 +127,17 @@ def export(plan: dict, project: Path, out: Path) -> dict:
     # Check ancestors too: output must not be silently redirected through a symlink.
     if any(p.is_symlink() for p in (out, *out.parents)):
         raise ValueError('symlink output is not supported')
-    out.mkdir(parents=True, exist_ok=False)
+    out.mkdir(parents=True, exist_ok=False, mode=0o700)
+    warnings = review_warnings(plan)
     receipt = {'schema_version': 1, 'plan_sha256': core.digest(plan),
                'validator_sha256': hashlib.sha256(CORE.read_bytes()).hexdigest(),
                'helper_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+               'skill_sha256': hashlib.sha256((Path(__file__).resolve().parents[1] / 'SKILL.md').read_bytes()).hexdigest(),
                'structurally_valid': not findings, 'semantic_quality': 'not_evaluated',
-               'sources': sources, 'findings': findings, 'model_calls': 0}
+               'sources': sources, 'findings': findings, 'review_warnings': warnings, 'model_calls': 0}
     for name, value in (('plan.json', plan), ('checks.json', receipt)):
         (out / name).write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n', encoding='utf-8')
-    (out / 'review.md').write_text(markdown(plan, findings), encoding='utf-8')
+    (out / 'review.md').write_text(markdown(plan, findings, warnings), encoding='utf-8')
     return receipt
 
 

@@ -1,6 +1,7 @@
 """Portable installation and offline delivery tests, not claims of host/model accuracy."""
 from copy import deepcopy
 import hashlib
+import html
 import importlib.util
 import json
 import os
@@ -107,6 +108,8 @@ def test_valid_source_is_fingerprinted_but_not_called_semantically_correct(tmp_p
     assert receipt['sources'][0]['sha256'] == hashlib.sha256(source.read_bytes()).hexdigest()
     assert receipt['structurally_valid']
     assert receipt['semantic_quality'] == 'not_evaluated'
+    assert '| S | app.py | 1-1 |' in (tmp_path / 'out/review.md').read_text()
+    assert receipt['skill_sha256'] == hashlib.sha256((ROOT / 'skills/decomposion/SKILL.md').read_bytes()).hexdigest()
 
 
 @pytest.mark.parametrize('mutation,code', [('cycle','HARD_CYCLE'), ('dangling','INVALID_EDGE'), ('evidence','UNKNOWN_EVIDENCE_ID'), ('untraceable','UNTRACEABLE_PLAN_ITEM')])
@@ -150,3 +153,15 @@ def test_skill_contract_is_shared_and_has_no_host_specific_shell_interpolation()
     assert f'version: "{installer.VERSION}"' in skill
     assert '$ARGUMENTS' not in skill and '!`' not in skill
     assert 'does not call an LLM' not in skill or 'API key' in skill
+
+
+def test_outcome_only_cloud_failure_is_visible_without_inventing_a_quality_grade(tmp_path):
+    # Regression shape observed in P02 Skill cloud run 35166450309: only outcomes.
+    plan = deepcopy(reviewer.EXAMPLE)
+    plan['nodes'] = [plan['nodes'][0]]
+    plan['edges'] = []
+    receipt = reviewer.export(plan, tmp_path, tmp_path / 'out')
+    assert receipt['structurally_valid']
+    assert receipt['semantic_quality'] == 'not_evaluated'
+    assert [w['code'] for w in receipt['review_warnings']] == ['NO_TASKS']
+    assert 'NO_TASKS' in html.unescape((tmp_path / 'out/review.md').read_text())

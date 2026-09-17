@@ -15,6 +15,8 @@ Honor the host's permissions. Never read credentials or bypass approval settings
 ## Planning procedure
 
 1. Establish the requested outcome and inspect the relevant repository paths.
+   Do not merely split the request into sentence-shaped nodes. Instructions such as
+   "plan only" or "produce a plan" are not outcomes, decisions or tasks.
    Separate current facts, proposed changes, decisions and unknowns. Record evidence
    as file paths with real line ranges. Bounded excerpts do not prove absence in
    the entire repository. Reuse existing capabilities before proposing replacements.
@@ -22,7 +24,10 @@ Honor the host's permissions. Never read credentials or bypass approval settings
    domains, actors, data lifecycle, permission changes and failure/recovery. State
    why the chosen axis suits this change. Do not blindly expand every axis into tasks.
 3. Produce small, independently reviewable tasks. Give each a concrete acceptance
-   condition in its text. Link tasks to outcomes/decisions/evidence. Split only when
+   condition in its text. Name the affected capability/code path and the change or
+   targeted investigation. An outcome-only graph is not a decomposed work plan.
+   When evidence is insufficient, propose bounded investigation rather than generic
+   filler or invented implementation. Link tasks to outcomes/decisions/evidence. Split only when
    different acceptance conditions or dependencies justify it; do not target a task count.
 4. Add only justified dependencies. `precedes` means the source is an acceptance
    prerequisite of the target; `affects` and `informs` do not block execution.
@@ -31,6 +36,8 @@ Honor the host's permissions. Never read credentials or bypass approval settings
    oversized tasks, unjustified ordering and unknowns presented as facts. Correct
    supported errors once, retain unresolved decisions, and stop. Self-review is not
    independent validation. Do not silently choose product policies for the user.
+   Use `observed` only for existing behavior supported by code, not for the requested
+   feature. Use `request` for requested work and cite code IDs only where relevant.
 
 ## Plan contract
 

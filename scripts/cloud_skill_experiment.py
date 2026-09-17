@@ -8,13 +8,15 @@ import os
 from pathlib import Path
 import platform
 import random
+import subprocess
+import sys
 import time
 
 from planning_eval.core import digest, evaluate
 from planning_eval.experiment import complete, load_packet, parse_object, response_text
 
 
-def experiment(packet_path: Path, skill_path: Path, out: Path) -> dict:
+def experiment(packet_path: Path, skill_path: Path, out: Path, project: Path, helper: Path) -> dict:
     packet = load_packet(packet_path)
     items = packet['payload']['items']
     if {i['case']['id'] for i in items} != {'P01', 'P02', 'P10'}:
@@ -34,7 +36,7 @@ def experiment(packet_path: Path, skill_path: Path, out: Path) -> dict:
                'packet_sha256': packet['sha256'], 'skill_sha256': hashlib.sha256(skill.encode()).hexdigest(),
                'python': platform.python_version(), 'platform': platform.platform(),
                'subscription_host_executed': False, 'semantic_quality_evaluated': False,
-               'grammar_constrained': False, 'retries': 0, 'queue': queue, 'trials': []}
+               'grammar_constrained': False, 'retries': 0, 'queue': queue, 'actual_model_calls': 0, 'trials': []}
     for idx, (i, arm) in enumerate(queue, 1):
         item = items[i]
         directory = out / f'{idx:02d}-{item["case"]["id"]}-{arm}'
@@ -46,6 +48,7 @@ def experiment(packet_path: Path, skill_path: Path, out: Path) -> dict:
         row = {'case': item['case']['id'], 'arm': arm, 'json_valid': False, 'structure_valid': False}
         start = time.monotonic()
         try:
+            receipt['actual_model_calls'] += 1
             response = complete(config, prompt)
             (directory / 'response.json').write_text(json.dumps(response, ensure_ascii=False, indent=2), encoding='utf-8')
             row['finish_reason'] = response.get('choices', [{}])[0].get('finish_reason')
@@ -57,17 +60,32 @@ def experiment(packet_path: Path, skill_path: Path, out: Path) -> dict:
             (directory / 'plan.json').write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding='utf-8')
             score = evaluate(item['case'], plan)
             row.update(structure_valid=score['structurally_valid'], findings=score['findings'],
-                       nodes=len(plan['nodes']), edges=len(plan['edges']), review_status=score['review_status'])
+                       nodes=len(plan['nodes']), edges=len(plan['edges']), review_status=score['review_status'],
+                       task_nodes=sum(n['kind'] == 'task' for n in plan['nodes']))
+            # Add only the verified source index, never change model nodes/edges.
+            delivery = dict(plan, sources=[{k: source[k] for k in ('id', 'path', 'start', 'end')}
+                                          for source in item['input']['sources']])
+            delivery_path = directory / 'delivery-plan.json'
+            delivery_path.write_text(json.dumps(delivery, ensure_ascii=False, indent=2), encoding='utf-8')
+            rendered = subprocess.run([sys.executable, '-I', str(helper.resolve()), '--project',
+                                      str(project.resolve()), '--plan', str(delivery_path.resolve()),
+                                      '--out', str((directory / 'review').resolve())],
+                                     capture_output=True, text=True, timeout=30, check=False)
+            row['delivery_exit_code'] = rendered.returncode
+            (directory / 'delivery.stdout.txt').write_text(rendered.stdout, encoding='utf-8')
+            (directory / 'delivery.stderr.txt').write_text(rendered.stderr, encoding='utf-8')
+            check_path = directory / 'review/checks.json'
+            if check_path.exists():
+                row['review_warnings'] = json.loads(check_path.read_text())['review_warnings']
         except (ValueError, TypeError, KeyError) as exc:
             # Schema/parse failures are experiment observations, not repaired or retried.
             row['error'] = f'{type(exc).__name__}: {exc}'
         finally:
             row['seconds'] = time.monotonic() - start
-            row['artifacts_sha256'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.iterdir() if p.is_file()}
+            row['artifacts_sha256'] = {p.relative_to(directory).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.rglob('*') if p.is_file()}
             receipt['trials'].append(row)
             (out / 'receipt.json').write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding='utf-8')
             print(json.dumps(row, ensure_ascii=False), flush=True)
-    receipt['actual_model_calls'] = len(queue)
     receipt['arms'] = {a: {'trials': len([r for r in receipt['trials'] if r['arm'] == a]),
                            'json_valid': sum(r['json_valid'] for r in receipt['trials'] if r['arm'] == a),
                            'structure_valid': sum(r['structure_valid'] for r in receipt['trials'] if r['arm'] == a)} for a in arms}
@@ -79,6 +97,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--packet', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--project', type=Path, required=True)
+    parser.add_argument('--helper', type=Path, required=True)
     parser.add_argument('--skill', type=Path, default=Path('skills/decomposion/SKILL.md'))
     args = parser.parse_args()
-    print(json.dumps(experiment(args.packet, args.skill, args.out), ensure_ascii=False, indent=2))
+    print(json.dumps(experiment(args.packet, args.skill, args.out, args.project, args.helper), ensure_ascii=False, indent=2))
