@@ -1,69 +1,93 @@
 # decomposion
 
-Decomposion is a **project reasoning layer** for turning complex changes into structured outcomes, impacts, decisions, risks, unknowns, contradictions, dependencies, tasks, and evidence.
+Decomposion is a **planning and visual-review skill** for complex software changes. It helps a coding agent inspect the current repository, decompose the requested change, expose decisions/risks/unknowns, and produce an evidence-backed dependency view **before implementation**.
 
-It is intentionally not a generic project manager and not another coding agent. The initial product sits **before and alongside** tools such as Claude Code and Codex: it helps determine what must change, what is affected, what is missing, what is still unknown, what must happen first, and what evidence supports the plan.
+It is intentionally not an autonomous executor or project manager.
 
-## Try the local experiment lab
+## Try it with your subscription coding agent
 
-The repository now provides an installable, provider-free CLI (`0.2.0.dev0`, not a published PyPI release):
+The public skill lives at `skills/decomposion/SKILL.md` and follows the standard Agent Skills layout. The `skills` CLI can discover skills from a public GitHub repository and install a selected skill for supported agents. citeturn0search3
+
+From the project where you want to use Decomposion:
+
+```bash
+# Inspect what the repository publishes
+npx skills add inchan/decomposion --list
+
+# Codex
+npx skills add inchan/decomposion --skill decomposion -a codex -y
+
+# Claude Code
+npx skills add inchan/decomposion --skill decomposion -a claude-code -y
+```
+
+Then start a **fresh** Codex or Claude Code session in that project and explicitly invoke the installed skill:
+
+```text
+Codex:
+$decomposion 문서 공유 기능을 추가하려고 합니다. 구현하지 말고 계획과 리뷰를 만들어주세요.
+
+Claude Code:
+/decomposion 문서 공유 기능을 추가하려고 합니다. 구현하지 말고 계획과 리뷰를 만들어주세요.
+```
+
+The skill uses the model/account already provided by your coding-agent subscription. Decomposion does not ask you to copy an OpenAI/Anthropic API key or login token.
+
+For a team/project install, keep the default project scope. If you intentionally want the skill available across projects, the `skills` CLI also supports `-g`; review the destination before choosing global scope. The CLI's default install can use symlinks; add `--copy` when you explicitly want independent copied files. citeturn0search3
+
+### Alternative installer
+
+If you do not have Node/npx, this repository also includes a conservative Python installer:
+
+```bash
+python3 scripts/install_skill.py --agent codex --project /absolute/path/to/project
+python3 scripts/install_skill.py --agent claude --project /absolute/path/to/project
+```
+
+It requires Python 3.11+, creates only the project-local skill directory, records checksums, and refuses to overwrite a modified installation.
+
+See [docs/AGENT_SKILL.md](docs/AGENT_SKILL.md) for output files, removal/update notes, limitations, and the cloud verification record.
+
+## What you should expect
+
+The agent should return planning artifacts rather than implementation:
+
+- `plan.json` — typed outcomes/tasks/decisions/risks/unknowns and relationships;
+- `checks.json` — deterministic structural/evidence checks;
+- `review.md` — review-first Markdown with Mermaid dependency graph, domain grouping, and unresolved decisions.
+
+Structural validity is **not** a semantic quality score. The first public cloud pilot validated installation, real-model failure capture, and the deterministic review path; it did not establish that Decomposion improves planning quality.
+
+## Development / evaluation
+
+The repository also contains the evaluation lab used to test planning behavior:
 
 ```bash
 python3 scripts/bootstrap_lab.py
 . .venv/bin/activate
 decomposion doctor
 python -m pytest
-decomposion lab init --workspace "$HOME/decomposion-lab" --profile smoke
 ```
 
-See [the Korean local/cloud runbook](docs/LOCAL_LAB.md) for model controls, independent checkouts,
-four-stage manual analysis, recording and version management. Open this checkout in a Dev Container
-or Codespaces to use `.devcontainer/devcontainer.json`.
+See [docs/LOCAL_LAB.md](docs/LOCAL_LAB.md) and [docs/PLANNING_EVAL_V1.md](docs/PLANNING_EVAL_V1.md).
 
-**No command above runs a model.** This is an experiment preparation/recording layer, not a completed
-reasoning engine or MCP server. A captured answer is not a validated answer. Fixture CI reports are
-not evidence of model performance. Live experiments remain under the operator's control.
+## Product boundary
 
-## Core idea
+Decomposion currently focuses on:
 
-`Goal -> Outcomes -> Multi-lens Impact Scan -> Gap Critic -> Typed Dependencies -> Tasks -> Projections`
+`Request -> repository evidence -> outcomes -> decomposition -> impact cross-check -> critique -> dependencies -> tasks -> visual review`
 
-The product is evaluation-first. This architecture is justified only if it materially outperforms strong plain-LLM and structured-prompt baselines on held-out and adversarial cases while controlling speculative noise.
-
-## Why this exists
-
-Most AI planning tools jump from a request directly to tasks. That is fragile for cross-cutting changes. For example, adding document sharing to a RAG SaaS may affect document ownership, authorization, retrieval, historical chat state, auditability, and revocation semantics.
-
-But Decomposion must not turn common patterns into invented facts. If the supplied context does not establish whether a cache, vector database, tenant model, or external-sharing path exists, the engine should surface that uncertainty rather than pretending it knows.
+Direct shell execution of the proposed work, autonomous orchestration, deployment, Jira/Linear replacement, and automatic code changes are outside the current product core.
 
 ## Repository map
 
-- [`docs/LOCAL_LAB.md`](docs/LOCAL_LAB.md) — installation and executable local/cloud experiment protocol
-- [`CHANGELOG.md`](CHANGELOG.md) — development-version changes
-- [`docs/PRODUCT.md`](docs/PRODUCT.md) — positioning, product principles, validation bar
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — reasoning pipeline and runtime architecture
-- [`docs/GRAPH_SCHEMA.md`](docs/GRAPH_SCHEMA.md) — working IR, epistemic states, dependency semantics
-- [`docs/MCP.md`](docs/MCP.md) — Claude Code/Codex integration contract
-- [`docs/EVALUATION.md`](docs/EVALUATION.md) — development/blind/adversarial evaluation strategy
-- [`docs/MVP.md`](docs/MVP.md) — evaluation-first implementation sequence
-- [`golden/software/document-sharing.yaml`](golden/software/document-sharing.yaml) — development reference case
-- [`golden/software/document-sharing-underspecified.yaml`](golden/software/document-sharing-underspecified.yaml) — adversarial abstention case
-
-## Initial product boundary
-
-The first release should own **Understand** and the front half of **Plan**:
-
-1. ingest current-system context;
-2. normalize a proposed change;
-3. derive desired outcomes;
-4. scan impacts across multiple lenses;
-5. challenge the result for omissions, speculation, and contradictions;
-6. derive typed dependencies and execution-ready tasks;
-7. present one reasoning graph through multiple projections;
-8. expose the reasoning layer to local coding agents via MCP.
-
-Direct shell execution, autonomous agent orchestration, deployment, full resource scheduling, and Jira/Linear replacement are explicitly deferred.
+- [skills/decomposion/SKILL.md](skills/decomposion/SKILL.md) — installable agent skill
+- [docs/AGENT_SKILL.md](docs/AGENT_SKILL.md) — human installation/use guide
+- [docs/PRODUCT.md](docs/PRODUCT.md) — positioning and product principles
+- [docs/EVALUATION.md](docs/EVALUATION.md) — evaluation strategy
+- [docs/GRAPH_SCHEMA.md](docs/GRAPH_SCHEMA.md) — working graph/IR concepts
+- [docs/LOCAL_LAB.md](docs/LOCAL_LAB.md) — reproducible experiment lab
 
 ## Development standard
 
-Every reasoning change should be evaluated against development, blind, and adversarial cases. Prefer structured graph deltas over prose-only output, deterministic graph validation over LLM guesses, explicit provenance over unsupported certainty, and `unknown` over fabricated confidence.
+Prefer a smaller mechanism that can be tested over a larger architecture that merely looks complete. Reasoning changes should be evaluated against development, blind, and adversarial cases. Prefer explicit provenance over unsupported certainty and `unknown` over fabricated confidence.
