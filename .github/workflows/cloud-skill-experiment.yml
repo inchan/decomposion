@@ -35,6 +35,16 @@ jobs:
           mkdir -p "$RUNNER_TEMP/skill-project"
           python scripts/install_skill.py --agent codex --project "$RUNNER_TEMP/skill-project"
           python scripts/install_skill.py --agent claude --project "$RUNNER_TEMP/skill-project"
+      - name: Verify skills CLI discovery and clean installs
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/skills-cli-codex" "$RUNNER_TEMP/skills-cli-claude"
+          npx --yes skills add "$GITHUB_WORKSPACE" --list | tee "$RUNNER_TEMP/skills-list.txt"
+          grep -q 'decomposion' "$RUNNER_TEMP/skills-list.txt"
+          (cd "$RUNNER_TEMP/skills-cli-codex" && npx --yes skills add "$GITHUB_WORKSPACE" --skill decomposion -a codex -y --copy)
+          (cd "$RUNNER_TEMP/skills-cli-claude" && npx --yes skills add "$GITHUB_WORKSPACE" --skill decomposion -a claude-code -y --copy)
+          test -f "$RUNNER_TEMP/skills-cli-codex/.agents/skills/decomposion/SKILL.md"
+          test -f "$RUNNER_TEMP/skills-cli-claude/.claude/skills/decomposion/SKILL.md"
       - name: Prepare the existing evidence packet (no application execution)
         run: |
           decomposion lab init --workspace "$RUNNER_TEMP/source-lab" --profile smoke
