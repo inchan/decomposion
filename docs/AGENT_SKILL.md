@@ -58,25 +58,30 @@ The host may request permission to create planning artifacts or run the bundled
 Python helper. Do not disable its safety checks. The skill does not force a number
 of model calls or guarantee the host will follow every instruction.
 
-## 분해 강도 조절: `--granularity 1..5`
+## 분해 강도 조절: `--level` 또는 `-l`
 
-**Skill 0.2.0부터** 호출 문장에 분해 강도를 지정할 수 있습니다. 기본값은 3입니다.
+**Skill 0.2.0부터** 숫자와 단어를 모두 받습니다. 기본값은 **normal (3)**입니다.
 설치 명령이나 Claude/Codex 실행파일의 옵션이 아니라 **스킬에 전달하는 요청**입니다.
-`--granularity=N`도 허용하며 1–5 밖의 값이나 중복 지정은 사용하지 않습니다.
 
-| 값 | 목적 | 문서 공유 기능의 분해 예시 (실험 결과 아님) |
+| 숫자 | 단어 | 목적 |
 |---|---|---|
-| 1 | 러프한 개요 | 안전한 공유 / 공유 회수 / 감사 가능이라는 큰 목표 |
-| 2 | 산출물 묶음 | 공유 정책, 공유·회수 기능, 접근 차단 검증 묶음 |
-| 3 | 작업 단위 · 기본값 | 권한 검사 구현, 회수 처리, 검색 접근 검증을 각각 입력·산출물·완료 조건으로 정의 |
-| 4 | 세부 단계 | 권한 평가, 각 접근 경로 연결, 실패 처리, 통합 검증으로 세분화 |
-| 5 | 극세분화 | 대상 하나의 권한 변경, 그 결과 한 가지의 확인, 실패 경로 하나의 검증까지 |
+| 1 | rough | 큰 목표·기능만 보는 러프한 개요 |
+| 2 | coarse | 산출물 중심의 작업 묶음 |
+| 3 | normal | 입력·산출물·완료 조건이 명확한 독립 작업 · 기본값 |
+| 4 | fine | 구현·검증·실패 처리 등의 세부 단계 |
+| 5 | micro | 의미 있는 상태 변경·확인·조사 하나까지 극세분화 |
 
 ```text
-/decomposion --granularity 1 문서 공유 기능을 러프하게 분해해주세요. 구현은 하지 마세요.
-/decomposion --granularity 3 문서 공유 기능을 작업 단위로 분해해주세요. 구현은 하지 마세요.
-/decomposion --granularity 5 같은 범위에서 가능한 최소 검증 단위까지 쪼개주세요. 구현은 하지 마세요.
+/decomposion -l rough 문서 공유 기능을 러프하게 분해해주세요. 구현은 하지 마세요.
+/decomposion --level normal 문서 공유 기능을 작업 단위로 분해해주세요.
+/decomposion -l 3 문서 공유 기능을 작업 단위로 분해해주세요.
+/decomposion -l micro 같은 범위에서 가능한 최소 검증 단위까지 쪼개주세요.
 ```
+
+`--level normal`, `-l normal`, `--level 3`, `-l 3`은 같은 설정입니다.
+`--level=fine`처럼 등호를 사용할 수 있으며 단어의 대소문자는 구분하지 않습니다.
+기존 `--granularity 3`도 호환됩니다. 세 이름은 하나의 옵션이므로 혼용·중복 지정은
+값이 같아도 거부합니다. 값 누락·잘못된 단어·범위 밖 숫자도 자동 보정하지 않습니다.
 
 Codex에서는 `/decomposion` 대신 `$decomposion`을 사용합니다.
 높은 값은 **분해 강도**이지 점수, 트리의 정확한 깊이, 화면 확대 정도 또는 에이전트 수가 아닙니다.
@@ -85,13 +90,14 @@ Codex에서는 `/decomposion` 대신 `$decomposion`을 사용합니다.
 빈 프로젝트에서 세밀한 구현 근거가 부족하면 조사할 작업과 그 한계를 남기고,
 존재하지 않는 파일이나 인프라를 만들어내지 않습니다. 같은 수준이어도 가지마다 깊이는 다를 수 있습니다.
 
-새 계획에는 `granularity`와 분해를 멈춘 이유인 `granularity_note`를 기록합니다.
+입력한 단어는 숫자로 정규화하고, 새 계획의 `granularity`는 기존처럼 정수 1–5로 저장합니다.
+별도의 문자열 필드를 추가하지 않습니다. 분해를 멈춘 이유는 `granularity_note`에 기록합니다.
 에이전트는 선택한 값으로 계획을 만든 뒤, 같은 값으로 검증기를 호출합니다.
 
 ```bash
 python3 "<skill-directory>/scripts/review.py" \
   --project "<project-root>" --plan "<plan.json>" --out "<new-review-directory>" \
-  --granularity 3
+  --level normal
 ```
 
 이 helper 옵션은 **이미 만든 계획의 설정값이 맞는지 검사**할 뿐 작업을 새로 분해하지 않습니다.

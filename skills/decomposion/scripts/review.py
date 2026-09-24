@@ -18,7 +18,7 @@ spec = importlib.util.spec_from_file_location('decomposion_core', CORE)
 core = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(core)
 
-GRANULARITY_LEVELS = {1: 'overview', 2: 'work package', 3: 'task', 4: 'step', 5: 'atomic'}
+GRANULARITY_LEVELS = {1: 'rough', 2: 'coarse', 3: 'normal', 4: 'fine', 5: 'micro'}
 
 EXAMPLE = {
     'granularity': 3,
@@ -41,6 +41,14 @@ def safe(value) -> str:
     for c in ('|', '`', '[', ']', '*', '_', '\\'):
         value = value.replace(c, f'&#{ord(c)};')
     return value
+
+
+def parse_level(value: str) -> int:
+    """Normalize CLI names/numbers; stored plan metadata remains a strict integer."""
+    for level, name in GRANULARITY_LEVELS.items():
+        if value.lower() in (str(level), name):
+            return level
+    raise argparse.ArgumentTypeError('level must be 1..5 or rough/coarse/normal/fine/micro')
 
 
 def granularity(plan: dict, expected: int | None = None) -> int | None:
@@ -170,20 +178,21 @@ def export(plan: dict, project: Path, out: Path, expected_granularity: int | Non
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument('--example', action='store_true')
     parser.add_argument('--project', type=Path)
     parser.add_argument('--plan', type=Path)
     parser.add_argument('--out', type=Path)
-    parser.add_argument('--granularity', type=int, choices=range(1, 6), action='append',
-                        help='Expected level already recorded in --plan; validates metadata, does not split tasks')
+    parser.add_argument('--level', '-l', '--granularity', dest='granularity',
+                        type=parse_level, action='append', metavar='LEVEL',
+                        help='1..5 or rough/coarse/normal/fine/micro; checks --plan, does not split tasks')
     args = parser.parse_args()
     if args.granularity is not None and len(args.granularity) != 1:
-        parser.error('--granularity may be supplied only once')
+        parser.error('--level / -l / --granularity may be supplied only once')
     args.granularity = args.granularity[0] if args.granularity else None
     if args.example:
         if args.granularity is not None:
-            parser.error('--granularity checks --plan; cannot be used with --example')
+            parser.error('--level checks --plan; cannot be used with --example')
         print(json.dumps(EXAMPLE, ensure_ascii=False, indent=2))
         return 0
     if not all((args.project, args.plan, args.out)):

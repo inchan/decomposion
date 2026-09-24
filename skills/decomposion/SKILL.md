@@ -14,21 +14,24 @@ Honor the host's permissions. Never read credentials or bypass approval settings
 
 ## Planning procedure
 
-### Granularity parameter
+### Level parameter
 
-Read `--granularity N` (or `--granularity=N`) from the user's invocation/request.
-Allow one integer from 1 to 5. For a new plan, default to **3** when omitted.
-Reject invalid, missing or repeated values before planning; explain the valid range
-instead of silently choosing another level. This is a **skill instruction input**,
-not a Codex/Claude CLI option or a `skills add` installation flag.
+Read `--level VALUE` (or `-l VALUE`, `--level=VALUE`) from the user's invocation.
+Numbers and words are equivalent: **1=rough, 2=coarse, 3=normal, 4=fine, 5=micro**.
+Words are case-insensitive. For a new plan, default to **normal (3)** when omitted.
+Legacy `--granularity N` / `--granularity=N` still work and also accept the words.
+Allow exactly one setting across all flag aliases, even if repeated values agree.
+Reject unknown words, values outside 1–5, missing values and duplicates before planning;
+do not silently default. Normalize the selected value to an integer in `granularity`.
+This is a **skill instruction input**, not a host CLI or `skills add` installation flag.
 
 | Value | Level | Where to stop decomposing |
 |---|---|---|
-| 1 | overview / rough | Outcomes and major capabilities/workstreams. Keep material decisions, risks and unknowns visible. Tasks are optional; this is not an execution-ready breakdown. |
-| 2 | work package | Coherent deliverables with their acceptance conditions and boundary contracts. Keep implementation detail grouped. |
-| 3 | task / default | Independently implementable or investigable, verifiable tasks with bounded inputs, outputs and acceptance conditions. A candidate handoff unit, not automatically a separate agent. |
-| 4 | step | Break tasks into concrete implementation, validation, migration or recovery steps **when applicable**, each with an observable result. Show integration work and shared-resource conflicts. |
-| 5 | atomic / extreme | Split as far as the evidence supports into one meaningful state change, check, failure-path test or bounded investigation per leaf. Stop before splitting into tokens, keystrokes or unverifiable fragments. |
+| 1 | rough | Outcomes and major capabilities/workstreams. Keep material decisions, risks and unknowns visible. Tasks are optional; this is not an execution-ready breakdown. |
+| 2 | coarse | Coherent deliverables with their acceptance conditions and boundary contracts. Keep implementation detail grouped. |
+| 3 | normal / default | Independently implementable or investigable, verifiable tasks with bounded inputs, outputs and acceptance conditions. A candidate handoff unit, not automatically a separate agent. |
+| 4 | fine | Break tasks into concrete implementation, validation, migration or recovery steps **when applicable**, each with an observable result. Show integration work and shared-resource conflicts. |
+| 5 | micro | Split as far as the evidence supports into one meaningful state change, check, failure-path test or bounded investigation per leaf. Stop before splitting into tokens, keystrokes or unverifiable fragments. |
 
 The level controls **work-unit size**, not hierarchy depth, graph zoom, task count,
 quality, or agent count. The five presets are a product convention, not a proven
@@ -103,12 +106,12 @@ python3 "<skill-directory>/scripts/review.py" --example
 
 Read-only investigation is allowed. The only writes for this request are planning
 artifacts in a new `.decomposion/` subfolder (or the user's chosen output location).
-Save the plan JSON, then run the bundled helper with the **same selected N**:
+Save the plan JSON, then run the bundled helper with the **same selected value**:
 
 ```bash
 python3 "<skill-directory>/scripts/review.py" \
   --project "<project-root>" --plan "<plan.json>" --out "<new-review-directory>" \
-  --granularity N
+  --level <selected-value>
 ```
 
 The helper's flag checks the recorded setting matches the request; it does not
