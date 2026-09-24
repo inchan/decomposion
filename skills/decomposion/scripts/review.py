@@ -18,7 +18,11 @@ spec = importlib.util.spec_from_file_location('decomposion_core', CORE)
 core = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(core)
 
+GRANULARITY_LEVELS = {1: 'rough', 2: 'coarse', 3: 'normal', 4: 'fine', 5: 'micro'}
+
 EXAMPLE = {
+    'granularity': 3,
+    'granularity_note': 'One policy decision and one independently verifiable retrieval change; no implementation stack is assumed.',
     'axis': 'Outcome, cross-checked against permissions and failure recovery.',
     'sources': [],
     'nodes': [
@@ -39,7 +43,31 @@ def safe(value) -> str:
     return value
 
 
+def parse_level(value: str) -> int:
+    """Normalize CLI names/numbers; stored plan metadata remains a strict integer."""
+    for level, name in GRANULARITY_LEVELS.items():
+        if value.lower() in (str(level), name):
+            return level
+    raise argparse.ArgumentTypeError('level must be 1..5 or rough/coarse/normal/fine/micro')
+
+
+def granularity(plan: dict, expected: int | None = None) -> int | None:
+    """Validate requested metadata only; never infer actual work size from a graph."""
+    level = plan.get('granularity')
+    if 'granularity' in plan and (type(level) is not int or level not in GRANULARITY_LEVELS):
+        raise ValueError('granularity must be an integer from 1 to 5')
+    if expected is not None:
+        if type(expected) is not int or expected not in GRANULARITY_LEVELS:
+            raise ValueError('expected granularity must be an integer from 1 to 5')
+        if level != expected:
+            raise ValueError('plan granularity is missing or differs from the requested level; re-plan, do not relabel')
+    if 'granularity_note' in plan:
+        core.text(plan['granularity_note'], 'granularity_note')
+    return level
+
+
 def inspect(plan: dict, project: Path) -> tuple[list[dict], list[dict]]:
+    granularity(plan)
     findings = core.validate_plan(plan)
     sources = core.index(plan.get('sources', []), 'sources')
     if 'request' in sources:
@@ -75,6 +103,8 @@ def inspect(plan: dict, project: Path) -> tuple[list[dict], list[dict]]:
 
 def review_warnings(plan: dict) -> list[dict]:
     # Delivery diagnostic, not a semantic score or a demand for arbitrary task counts.
+    if plan.get('granularity') == 1:
+        return [{'code': 'OVERVIEW_ONLY', 'detail': 'Level 1 intentionally shows the big picture, not an execution-ready task breakdown.'}]
     if not any(n['kind'] == 'task' for n in plan['nodes']):
         return [{'code': 'NO_TASKS', 'detail': 'No task nodes were supplied. Review whether this is only a requirements outline rather than a decomposed work plan.'}]
     return []
@@ -82,9 +112,13 @@ def review_warnings(plan: dict) -> list[dict]:
 
 def markdown(plan: dict, findings: list[dict], warnings: list[dict]) -> str:
     nodes = plan['nodes']
+    level = granularity(plan)
+    level_text = f'{level} / {GRANULARITY_LEVELS[level]}' if level is not None else 'unspecified (legacy plan)'
     lines = ['# Decomposion plan review', '',
              f"Structural checks: {'INVALID' if findings else 'valid'}. Semantic quality: **not evaluated**.",
-             '', 'Primary axis: ' + safe(plan.get('axis', 'Not specified')), '', '## Review first', '']
+             '', 'Primary axis: ' + safe(plan.get('axis', 'Not specified')),
+             '', 'Requested granularity: **' + level_text + '**. Actual granularity: **not evaluated**.',
+             'Stopping rationale: ' + safe(plan.get('granularity_note', 'Not supplied')), '', '## Review first', '']
     for node in nodes:
         if node['kind'] in {'decision', 'risk', 'unknown'}:
             lines.append(f"- **{safe(node['id'])} · {node['kind']}**: {safe(node['text'])}")
@@ -119,7 +153,8 @@ def markdown(plan: dict, findings: list[dict], warnings: list[dict]) -> str:
     return '\n'.join(lines)
 
 
-def export(plan: dict, project: Path, out: Path) -> dict:
+def export(plan: dict, project: Path, out: Path, expected_granularity: int | None = None) -> dict:
+    level = granularity(plan, expected_granularity)
     project = project.resolve(strict=True)
     if not project.is_dir():
         raise ValueError('project must be a directory')
@@ -134,6 +169,7 @@ def export(plan: dict, project: Path, out: Path) -> dict:
                'helper_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                'skill_sha256': hashlib.sha256((Path(__file__).resolve().parents[1] / 'SKILL.md').read_bytes()).hexdigest(),
                'structurally_valid': not findings, 'semantic_quality': 'not_evaluated',
+               'granularity': level, 'granularity_quality': 'not_evaluated',
                'sources': sources, 'findings': findings, 'review_warnings': warnings, 'model_calls': 0}
     for name, value in (('plan.json', plan), ('checks.json', receipt)):
         (out / name).write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n', encoding='utf-8')
@@ -142,13 +178,21 @@ def export(plan: dict, project: Path, out: Path) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument('--example', action='store_true')
     parser.add_argument('--project', type=Path)
     parser.add_argument('--plan', type=Path)
     parser.add_argument('--out', type=Path)
+    parser.add_argument('--level', '-l', '--granularity', dest='granularity',
+                        type=parse_level, action='append', metavar='LEVEL',
+                        help='1..5 or rough/coarse/normal/fine/micro; checks --plan, does not split tasks')
     args = parser.parse_args()
+    if args.granularity is not None and len(args.granularity) != 1:
+        parser.error('--level / -l / --granularity may be supplied only once')
+    args.granularity = args.granularity[0] if args.granularity else None
     if args.example:
+        if args.granularity is not None:
+            parser.error('--level checks --plan; cannot be used with --example')
         print(json.dumps(EXAMPLE, ensure_ascii=False, indent=2))
         return 0
     if not all((args.project, args.plan, args.out)):
@@ -156,7 +200,7 @@ def main() -> int:
     try:
         if args.plan.stat().st_size > 512_000:
             raise ValueError('plan exceeds 512 KB limit')
-        result = export(core.load_json(args.plan), args.project, args.out)
+        result = export(core.load_json(args.plan), args.project, args.out, args.granularity)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result['structurally_valid'] else 2
     except (OSError, ValueError, TypeError, KeyError) as exc:

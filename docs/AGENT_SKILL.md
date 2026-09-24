@@ -58,6 +58,57 @@ The host may request permission to create planning artifacts or run the bundled
 Python helper. Do not disable its safety checks. The skill does not force a number
 of model calls or guarantee the host will follow every instruction.
 
+## 분해 강도 조절: `--level` 또는 `-l`
+
+**Skill 0.2.0부터** 숫자와 단어를 모두 받습니다. 기본값은 **normal (3)**입니다.
+설치 명령이나 Claude/Codex 실행파일의 옵션이 아니라 **스킬에 전달하는 요청**입니다.
+
+| 숫자 | 단어 | 목적 |
+|---|---|---|
+| 1 | rough | 큰 목표·기능만 보는 러프한 개요 |
+| 2 | coarse | 산출물 중심의 작업 묶음 |
+| 3 | normal | 입력·산출물·완료 조건이 명확한 독립 작업 · 기본값 |
+| 4 | fine | 구현·검증·실패 처리 등의 세부 단계 |
+| 5 | micro | 의미 있는 상태 변경·확인·조사 하나까지 극세분화 |
+
+```text
+/decomposion -l rough 문서 공유 기능을 러프하게 분해해주세요. 구현은 하지 마세요.
+/decomposion --level normal 문서 공유 기능을 작업 단위로 분해해주세요.
+/decomposion -l 3 문서 공유 기능을 작업 단위로 분해해주세요.
+/decomposion -l micro 같은 범위에서 가능한 최소 검증 단위까지 쪼개주세요.
+```
+
+`--level normal`, `-l normal`, `--level 3`, `-l 3`은 같은 설정입니다.
+`--level=fine`처럼 등호를 사용할 수 있으며 단어의 대소문자는 구분하지 않습니다.
+기존 `--granularity 3`도 호환됩니다. 세 이름은 하나의 옵션이므로 혼용·중복 지정은
+값이 같아도 거부합니다. 값 누락·잘못된 단어·범위 밖 숫자도 자동 보정하지 않습니다.
+
+Codex에서는 `/decomposion` 대신 `$decomposion`을 사용합니다.
+높은 값은 **분해 강도**이지 점수, 트리의 정확한 깊이, 화면 확대 정도 또는 에이전트 수가 아닙니다.
+5가 3보다 빠르다는 보장은 없습니다. 인계·공유 맥락·수정 충돌·통합 비용은 별도로 검토합니다.
+목표와 범위는 유지하며, 위험·결정·불확실성을 낮은 수준이라는 이유로 숨기지 않습니다.
+빈 프로젝트에서 세밀한 구현 근거가 부족하면 조사할 작업과 그 한계를 남기고,
+존재하지 않는 파일이나 인프라를 만들어내지 않습니다. 같은 수준이어도 가지마다 깊이는 다를 수 있습니다.
+
+입력한 단어는 숫자로 정규화하고, 새 계획의 `granularity`는 기존처럼 정수 1–5로 저장합니다.
+별도의 문자열 필드를 추가하지 않습니다. 분해를 멈춘 이유는 `granularity_note`에 기록합니다.
+에이전트는 선택한 값으로 계획을 만든 뒤, 같은 값으로 검증기를 호출합니다.
+
+```bash
+python3 "<skill-directory>/scripts/review.py" \
+  --project "<project-root>" --plan "<plan.json>" --out "<new-review-directory>" \
+  --level normal
+```
+
+이 helper 옵션은 **이미 만든 계획의 설정값이 맞는지 검사**할 뿐 작업을 새로 분해하지 않습니다.
+설정값 불일치·잘못된 값은 출력 전 거부합니다. `checks.json`과 `review.md`에도 요청 수준을 표시하지만
+실제 분해 품질은 `not_evaluated`로 남깁니다. 기존 계획에 필드가 없으면 옵션 없이 그대로 읽으며,
+그 계획을 임의로 3단계라고 기록하지 않습니다. 수준 변경은 단순 재표기가 아니라 별도 수정안입니다.
+
+1단계에서는 작업이 없는 개요도 허용하되 `OVERVIEW_ONLY`로 실행계획이 아님을 표시합니다.
+아무 노드도 없는 계획은 모든 수준에서 오류입니다. 2–5단계의 작업 누락은 기존처럼 경고합니다.
+이 버전은 수준별 의미 품질이나 병렬 수행 최적값을 측정한 버전이 아닙니다.
+
 ## Output
 
 The agent saves a plan, invokes `scripts/review.py` inside the installed skill,
@@ -67,7 +118,10 @@ a domain-sorted table, and a relationship table for non-Mermaid viewers.
 It is a basic review artifact, not the future interactive graph product or proof
 of faster human review.
 
-The helper reuses the current `planning_eval/core.py`, bundled by the installer.
+The helper reuses `planning_eval/core.py` as a byte-identical bundled `scripts/_core.py`,
+so a skills-CLI directory-only installation also works without the controller repo.
+CI rejects drift between the canonical validator and its distribution copy; refresh
+the latter with `cp planning_eval/core.py skills/decomposion/scripts/_core.py` after core changes.
 It checks graph structure, evidence IDs, relative source paths, real line ranges
 and optional source hashes. It does not judge semantic entailment or plan quality.
 A graph can be structurally valid and still be a bad plan. The agent must self-review
@@ -75,8 +129,9 @@ its content and clearly label unresolved decisions. Model text is never executed
 
 ## Versioning and removal
 
-`INSTALL.json` records skill version 0.1.0 and SHA-256 for each installed file,
-including the bundled validator. Pin the repository commit for exact reproduction.
+Skill metadata records version **0.2.0** (separate from the evaluation Python package).
+The fallback Python installer also writes `INSTALL.json` with file SHA-256 hashes,
+including the bundled validator. The skills CLI manages its own installation metadata. Pin the repository commit for exact reproduction.
 No silent updates. To update, preserve/rename the installed `decomposion` directory
 outside the host's skill-discovery folder, then run the installer from the desired
 revision. To uninstall, remove only that installed skill directory. Keep experiment
