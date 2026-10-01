@@ -62,6 +62,7 @@ def test_mismatched_or_invalid_expected_level_rejected(tmp_path, expected):
 
 def test_overview_and_empty_graph_are_not_confused(tmp_path):
     plan = deepcopy(reviewer.EXAMPLE)
+    plan.pop('decomposition')  # this fixture tests overview/legacy behavior
     plan.update(granularity=1, nodes=[plan['nodes'][0]], edges=[])
     result = reviewer.export(plan, tmp_path, tmp_path / 'overview')
     assert result['structurally_valid']
