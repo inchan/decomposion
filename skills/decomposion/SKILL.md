@@ -2,7 +2,7 @@
 name: decomposion
 description: Decompose a proposed software change at an adjustable granularity into an evidence-backed plan and visual review, before implementation. Use for rough planning, detailed task breakdown, impact analysis and dependencies, not autonomous execution.
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Decomposion — choose the task size, plan first, review visually
@@ -67,6 +67,9 @@ and reconsider work boundaries/dependencies rather than just relabeling old node
    An outcome-only graph is an overview, not an executable work plan.
    Link tasks to outcomes/decisions/evidence. Preserve unresolved dependencies and
    state why further splitting was unnecessary or unsupported. Never target a count.
+   Retain intermediate parent items: do not discard them and deliver only final leaves.
+   Record what each parent was divided into and a short, inspectable boundary rationale.
+   This is decomposition provenance, not a private reasoning transcript.
 4. Add only justified dependencies. `precedes` means the source is an acceptance
    prerequisite of the target; `affects` and `informs` do not block execution.
    A missing edge does not prove parallel safety. Preserve valid alternative designs.
@@ -95,6 +98,29 @@ For local repository delivery also add `sources`, a list of
 `axis` explaining the chosen primary axis. Never invent paths or line numbers.
 The helper checks references against files, not whether prose is logically entailed.
 
+### Record the transformation, not only the result
+
+For new local plans also include:
+- `request`: the user's original feature requirement text, not a rewritten summary;
+- `title` on each node: a concise meaningful name in the user's language; retain the
+  full description/acceptance in `text`. IDs such as `T2` are never display names;
+- `decomposition`: records `{"parent": null, "children": ["goal"], "reason": "..."}`
+  followed by `{"parent": "goal", "children": ["policy", "check"], "reason": "..."}`.
+  `null` denotes the original request; any other parent and all children are existing
+  node IDs. One record per parent; preserve every actual intermediate split.
+
+Every planned item should have a path from the request, or explicitly remain unlinked
+with an explanation. Shared items can have several parents without duplicating tasks.
+A decomposition link means "this was divided into these parts", NOT "do this first".
+Do not copy `traces_to`, domain groups or `precedes` into a fabricated hierarchy.
+Reasons explain work boundaries using evidence/acceptance/handoff costs; they are
+not retrospective claims about hidden reasoning. State branch-specific stopping
+limits in the relevant node's `text` and summarize them in `granularity_note`.
+
+Legacy plans without these fields still render, but must say the original request
+or breakdown was not recorded. If reconstructing an old plan, use the actual user
+request and label the new hierarchy as a revision, not recovered execution history.
+
 ## Local delivery
 
 Resolve this skill's directory from the SKILL.md path supplied by the host, not the
@@ -120,7 +146,17 @@ without this metadata can still be reviewed without the flag and remain unspecif
 Preserve the first output. If structural errors are found, create a revised plan
 and a different output directory; never overwrite the record or claim success.
 Deliver `review.md`, `checks.json` and `plan.json`, showing the requested level and
-stopping rationale. Markdown includes a Mermaid prerequisite diagram and domain
-and relationship tables. In a viewer without Mermaid, use the tables.
+stopping rationale. Read the generated review before responding. The main deliverable
+starts with the original request, a **decomposition diagram**, and all recorded
+**before → after + why** splits; prerequisites are a separate diagram.
+
+In the chat response itself, show a named breakdown tree and boundary explanations
+in the user's language. Do not finish with only artifact paths, counts, ID chains or
+a few summary sentences. Show the original requirement (mark any excerpt), each
+main branch with its children, why it was separated and why decomposition stops
+there. Keep IDs secondary: "Retrieval authorization (T2)", never just "T2".
+For large plans, show each main branch, identify how many deeper items are folded,
+and point to the full unabridged before/after section; never call a preview complete.
+In a non-Mermaid viewer, show the named tree/before-after list, not raw edge IDs.
 State explicitly: structural checks are not a semantic or granularity-quality score.
 Describe the most important unresolved decisions and stop before code/issue changes.
