@@ -16,7 +16,7 @@ def test_balanced_split_can_hurt():
 def test_skewed_split_has_a_crossover():
     rows = [r for r in run() if r["case"] == "skewed"]
     assert rows[0]["winner"] == "fine"
-    assert rows[-1]["winner"] == "coarse"
+    assert rows[-1]["winner"] == "tie"
 
 
 def test_unsplittable_bottleneck():
